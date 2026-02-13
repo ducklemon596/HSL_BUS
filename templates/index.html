@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSL Real-time Map (Absolute Version)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { height: 100vh; width: 100%; }
+
+        /* --- 1. HIỆU ỨNG DI CHUYỂN MƯỢT --- */
+        /* Class này Leaflet tự sinh ra, ta tác động vào nó */
+        .leaflet-marker-icon {
+            transition: transform 1s linear; /* Chỉ transition thuộc tính transform để mượt nhất */
+        }
+
+        /* --- 2. STYLE CHO KHỐI ICON MỚI --- */
+        /* Đây là cái khung bao quanh cả số và xe */
+        .bus-container {
+            position: relative; /* Quan trọng: Làm mốc tọa độ cho số xe */
+            width: 40px;
+            height: 40px;
+            text-align: center;
+        }
+
+        .bus-badge {
+            position: absolute;
+            top: -18px; /* Bay cao hơn một chút để nhường chỗ cho mũi tên */
+            left: 50%;
+            transform: translateX(-50%);
+            
+            /* Màu xanh dương đẹp mắt */
+            background: linear-gradient(to bottom, #007bff, #0062cc); 
+            color: white;
+            
+            font-size: 11px; /* Chữ to hơn 1 xíu cho dễ đọc */
+            font-weight: bold;
+            padding: 3px 8px; /* Padding rộng hơn cho thoáng */
+            
+            /* Bo tròn mạnh để tạo hình viên thuốc */
+            border-radius: 12px; 
+            
+            z-index: 10;
+            white-space: nowrap;
+            
+            /* Bóng đổ 3D nhẹ nhàng */
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+        }
+
+        /* --- TẠO MŨI TÊN NHỎ CHỈ XUỐNG (NEW) --- */
+        /* Đây là kỹ thuật dùng border để vẽ hình tam giác trong CSS */
+        .bus-badge::after {
+            content: '';
+            position: absolute;
+            bottom: -5px; /* Nằm ngay dưới đít bong bóng */
+            left: 50%;
+            transform: translateX(-50%);
+            
+            /* Vẽ tam giác cân chỉ xuống */
+            width: 0; 
+            height: 0; 
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid #0062cc; /* Màu trùng với đáy của bong bóng */
+            
+            /* Hiệu ứng bóng nhẹ cho mũi tên (tùy chọn, trông sẽ thật hơn) */
+            filter: drop-shadow(0 2px 1px rgba(0,0,0,0.2));
+        }
+
+        /* Hình xe buýt (Giữ nguyên hoặc chỉnh margin nếu cần) */
+        .bus-emoji {
+            font-size: 28px;
+            line-height: 1;
+            margin-top: 6px; /* Đẩy xe xuống vừa đủ để mũi tên không chọc vào nóc */
+            filter: drop-shadow(0 3px 3px rgba(0,0,0,0.4));
+        }
+
+        /* Style cho popup bảng thông tin */
+        .info-table { width: 200px; font-size: 13px; border-collapse: collapse; }
+        .info-table td { padding: 4px 0; border-bottom: 1px solid #eee; }
+        .info-val { font-weight: bold; text-align: right; }
+        .popup-header { background: #007bff; color: white; padding: 5px; text-align: center; font-weight: bold; border-radius: 3px 3px 0 0; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
+    <script>
+        // --- SETUP BẢN ĐỒ ---
+        var map = L.map('map').setView([60.1699, 24.9384], 14);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; CARTO', maxZoom: 20
+        }).addTo(map);
+
+        var markers = {};
+        var socket = io();
+
+        socket.on('batch_update', function(msg) {
+            var allBuses = msg; 
+
+            for (var vehId in allBuses) {
+                var busData = allBuses[vehId];
+                if (!busData.lat || !busData.long) continue;
+
+                var route = busData.route || "?";
+                var displayId = vehId.includes('_') ? vehId.split('_')[1] : vehId;
+
+                // --- TẠO ICON HTML (CÁCH MỚI) ---
+                // Ta nhúng số tuyến (route) thẳng vào trong HTML của icon
+                var customHtml = `
+                    <div class="bus-container">
+                        <div class="bus-badge">${route}</div>
+                        <div class="bus-emoji">🚌</div>
+                    </div>
+                `;
+
+                var customIcon = L.divIcon({
+                    className: 'custom-div-icon', // Class rỗng
+                    html: customHtml,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20], // Tâm của icon nằm chính giữa
+                    popupAnchor: [0, -30]
+                });
+
+                // Nội dung Popup
+                var popupContent = `
+                    <div class="popup-header">Xe ${displayId} (Tuyến ${route})</div>
+                    <table class="info-table">
+                        <tr><td>Hướng:</td><td class="info-val">${busData.hdg || 0}°</td></tr>
+                        <tr><td>Nhà xe:</td><td class="info-val">${busData.oper || "?"}</td></tr>
+                    </table>
+                `;
+
+                // --- CẬP NHẬT HOẶC TẠO MỚI ---
+                if (markers[vehId]) {
+                    // Di chuyển marker (Cả khối Container sẽ trượt theo)
+                    markers[vehId].setLatLng([busData.lat, busData.long]);
+                    markers[vehId].setPopupContent(popupContent);
+                    
+                    // QUAN TRỌNG: Nếu số tuyến thay đổi (hiếm khi), ta cần update lại icon
+                    // Nhưng thường số tuyến cố định nên không cần setIcon lại để tối ưu
+                } else {
+                    var newMarker = L.marker([busData.lat, busData.long], {icon: customIcon})
+                        .bindPopup(popupContent);
+                    
+                    // LƯU Ý: Đã bỏ bindTooltip cũ đi rồi nhé!
+                    
+                    newMarker.addTo(map);
+                    markers[vehId] = newMarker;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

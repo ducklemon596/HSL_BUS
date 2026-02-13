@@ -1,0 +1,28 @@
+# --- 1. BẢO MẬT ---
+# Tuyệt đối không copy khóa và mật khẩu vào trong Image
+credentials.json
+.env
+
+# --- 2. Rác hệ thống & Python ---
+# Bỏ qua bytecode và log
+__pycache__/
+*.py[cod]
+*.log*
+# Bỏ qua môi trường ảo (Docker sẽ tự cài lại thư viện sạch)
+hsl/
+
+# --- 3. Git & IDE ---
+# Không cần lịch sử git hay cấu hình VS Code trong container
+.git/
+.gitignore
+.vscode/
+
+# --- 4. Docker Meta-files ---
+# Các file này dùng để build/run ở ngoài, không cần nằm bên trong
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# --- 5. Tài liệu & File rác khác ---
+README.md
+sample.json
