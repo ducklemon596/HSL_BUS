@@ -8,7 +8,6 @@ from google.cloud import pubsub_v1
 
 load_dotenv()
 
-# --- 1. CẤU HÌNH LOGGING (QUAN TRỌNG) ---
 # Tạo logger
 logger = logging.getLogger("HSL_Ingestion")
 logger.setLevel(logging.INFO)
@@ -16,10 +15,8 @@ logger.setLevel(logging.INFO)
 # Định dạng log: [Thời gian] [Mức độ] [Nội dung]
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
-# Handler 1: Ghi vào file (Tự động cắt file khi đạt 5MB, giữ lại 3 file cũ)
-# encoding='utf-8' để ghi được icon ✅ ❌
 file_handler = RotatingFileHandler(
-    "pipeline.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+    "pipeline.log", maxBytes=5 * 1024 * 1024, backupCount=10, encoding="utf-8"
 )
 file_handler.setFormatter(formatter)
 
