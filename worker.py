@@ -17,10 +17,9 @@ def callback(message):
         vp = data.get("VP")
 
         if vp:
-            # Tạo ID duy nhất
-            oper_id = str(vp.get("oper", "0"))
-            veh_num = str(vp.get("veh", "0"))
-            unique_veh_id = f"{oper_id}_{veh_num}"
+            unique_veh_id = vp.get(
+                "unique_veh_id", f"{vp.get('oper', '0')}_{vp.get('veh', '0')}"
+            )
             new_tst = vp.get("tst", 0)
 
             old_data_str = redis_client.get(f"bus:{unique_veh_id}")

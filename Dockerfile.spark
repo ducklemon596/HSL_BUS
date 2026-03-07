@@ -1,0 +1,4 @@
+FROM jupyter/pyspark-notebook:latest
+USER root
+RUN pip install redis google-cloud-pubsub
+USER ${NB_UID}

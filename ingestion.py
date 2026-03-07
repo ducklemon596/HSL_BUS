@@ -1,89 +1,93 @@
+import json
+import time
 import paho.mqtt.client as mqtt
 import os
 import ssl
 import logging
 from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
-from google.cloud import pubsub_v1
+from kafka import KafkaProducer
 
 load_dotenv()
 
-# Tạo logger
+# --- 1. Tạo logger ---
 logger = logging.getLogger("HSL_Ingestion")
 logger.setLevel(logging.INFO)
-
-# Định dạng log: [Thời gian] [Mức độ] [Nội dung]
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-
 file_handler = RotatingFileHandler(
     "pipeline.log", maxBytes=5 * 1024 * 1024, backupCount=10, encoding="utf-8"
 )
 file_handler.setFormatter(formatter)
-
-# Handler 2: In ra màn hình Console (để bạn vẫn theo dõi được trực tiếp)
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
-
-# Thêm cả 2 handler vào logger
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
-# --- 2. CẤU HÌNH MQTT & PUBSUB ---
+# --- 2. CẤU HÌNH MQTT & KAFKA ---
 MQTT_BROKER = os.getenv("MQTT_BROKER", "mqtt.hsl.fi")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 8883))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "/hfp/v2/journey/ongoing/vp/bus/#")
 
-GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
-GCP_PUBSUB_TOPIC = os.getenv("GCP_PUBSUB_TOPIC")
+KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka:9092")
+KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "hsl_bus")
 
-# Initialize Pub/Sub Publisher
-publisher = pubsub_v1.PublisherClient()
-try:
-    topic_path = publisher.topic_path(GCP_PROJECT_ID, GCP_PUBSUB_TOPIC)
-except Exception as e:
-    logger.error(f"❌ Lỗi cấu hình Pub/Sub: {e}")
-    exit(1)
-
-
-def get_callback(future, payload):
-    """
-    Wrapper function to capture the payload context for logging.
-    """
-
-    def callback(future):
-        try:
-            # Check if an exception occurred during publishing
-            if future.exception():
-                # Chỉ log lỗi vào file/console thay vì print
-                logger.error(f"❌ Pub/Sub Error: {future.exception()}")
-            else:
-                # Log mức INFO khi thành công
-                logger.info(f"🚀 Published to Pub/Sub. ID: {future.result()}")
-        except Exception as e:
-            logger.error(f"❌ Callback crash: {e}")
-
-    return callback
+# --- 3. KẾT NỐI KAFKA ---
+while True:
+    try:
+        producer = KafkaProducer(
+            bootstrap_servers=KAFKA_BROKER,
+            # Nhận vào Dictionary và tự động dịch ra nhị phân
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            key_serializer=lambda k: str(k).encode("utf-8"),
+        )
+        logger.info(f"✅ Connected to Kafka at {KAFKA_BROKER}")
+        break
+    except Exception as e:
+        logger.error(f"❌ Kafka connection failed: {e}. Retrying in 5 seconds...")
+        time.sleep(5)
 
 
-# --- CALLBACK FUNCTIONS (API VERSION 2) ---
+# --- CALLBACK FUNCTIONS CỦA KAFKA ---
+def on_send_success(record_metadata):
+    logger.info(
+        f"🚀 Sent to Kafka | Partition: {record_metadata.partition} | Offset: {record_metadata.offset}"
+    )
+
+
+def on_send_error(excp):
+    logger.error(f"❌ Kafka Error: {excp}")
+
+
+# --- CALLBACK FUNCTIONS CỦA MQTT ---
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code == 0:
         logger.info(f"✅ Connected via SSL! (Code: {reason_code})")
         logger.info(f"📡 Subscribing to: {MQTT_TOPIC}")
         client.subscribe(MQTT_TOPIC)
     else:
-        logger.error(f"❌ Connection failed, code: {reason_code}")
+        logger.error(f"❌ Connection to MQTT failed, code: {reason_code}")
 
 
 def on_message(client, userdata, msg):
     try:
-        payload = msg.payload
+        # Bước 1: Lấy string gốc
+        payload = msg.payload.decode("utf-8")
 
-        # Publish to Pub/Sub (Asynchronous)
-        future = publisher.publish(topic_path, payload)
+        # Bước 2: Dịch ra Dictionary
+        json_data = json.loads(payload)
+        vp = json_data.get("VP", {})
 
-        # Attach callback
-        future.add_done_callback(get_callback(future, payload))
+        if vp:
+            oper_id = str(vp.get("oper", "0"))
+            veh_num = str(vp.get("veh", "0"))
+            unique_veh_id = f"{oper_id}_{veh_num}"
+
+            vp["unique_veh_id"] = unique_veh_id
+
+            # Bước 4: Đẩy ĐÚNG biến json_data (Dictionary) đi để bộ serializer làm việc
+            producer.send(KAFKA_TOPIC, value=json_data, key=unique_veh_id).add_callback(
+                on_send_success
+            ).add_errback(on_send_error)
 
     except Exception as e:
         logger.error(f"❌ Processing error: {e}")
@@ -91,10 +95,7 @@ def on_message(client, userdata, msg):
 
 # --- CLIENT INITIALIZATION ---
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-
-# Enable SSL/TLS
 client.tls_set(cert_reqs=ssl.CERT_NONE)
-
 client.on_connect = on_connect
 client.on_message = on_message
 
