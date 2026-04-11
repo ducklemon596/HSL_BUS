@@ -1,0 +1,39 @@
+FROM python:3.9-slim-bullseye
+
+USER root
+
+ARG SPARK_VERSION=3.3.2
+ARG KAFKA_CLIENT_VERSION=3.4.1
+ARG DELTA_VERSION=2.3.0
+ENV PYSPARK_PYTHON=python3
+ENV PYSPARK_DRIVER_PYTHON=python3
+
+RUN apt-get update && apt-get install -y openjdk-11-jre-headless curl procps && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    redis \
+    kafka-python \
+    python-dotenv \
+    pyspark==${SPARK_VERSION} \
+    delta-spark==${DELTA_VERSION}
+
+ENV SPARK_HOME=/usr/local/lib/python3.9/site-packages/pyspark
+ENV PATH=$SPARK_HOME/bin:$PATH
+
+WORKDIR $SPARK_HOME/jars
+RUN curl -O https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/${SPARK_VERSION}/spark-sql-kafka-0-10_2.12-${SPARK_VERSION}.jar \
+    && curl -O https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/${KAFKA_CLIENT_VERSION}/kafka-clients-${KAFKA_CLIENT_VERSION}.jar \
+    && curl -O https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar \
+    && curl -O https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/${SPARK_VERSION}/spark-token-provider-kafka-0-10_2.12-${SPARK_VERSION}.jar
+
+RUN curl -O https://repo1.maven.org/maven2/io/delta/delta-core_2.12/${DELTA_VERSION}/delta-core_2.12-${DELTA_VERSION}.jar \
+    && curl -O https://repo1.maven.org/maven2/io/delta/delta-storage/${DELTA_VERSION}/delta-storage-${DELTA_VERSION}.jar
+
+RUN curl -O https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.5/gcs-connector-hadoop3-2.2.5-shaded.jar
+
+WORKDIR /app
+
+ENV GCP_CREDENTIALS=/app/credentials.json
+
+CMD ["sleep", "infinity"]

@@ -2,6 +2,7 @@
 # Tuyệt đối không copy khóa và mật khẩu vào trong Image
 credentials.json
 .env
+.env.example
 
 # --- 2. Rác hệ thống & Python ---
 # Bỏ qua bytecode và log

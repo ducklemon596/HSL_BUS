@@ -1,7 +1,6 @@
 flask
 flask-socketio
 redis
-google-cloud-pubsub
 python-dotenv
 paho-mqtt
 kafka-python
