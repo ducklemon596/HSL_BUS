@@ -3,7 +3,9 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from ..config import settings_instance
+from .settings import get_settings_instance
+
+settings_instance = get_settings_instance()
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -50,3 +52,22 @@ def get_logger(name: str) -> logging.Logger:
     logger.propagate = False
 
     return logger
+
+
+_logger_instance: logging.Logger = None
+
+
+def get_logger_instance(name: str) -> logging.Logger:
+    """
+    Get a singleton logger instance
+
+    Args:
+        name: Logger name (typically __name__)
+
+    Returns:
+        Logger instance
+    """
+    global _logger_instance
+    if _logger_instance is None:
+        _logger_instance = get_logger(name)
+    return _logger_instance

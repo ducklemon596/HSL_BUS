@@ -3,11 +3,12 @@
 from flask import Flask, render_template
 from flask_socketio import SocketIO
 
-from ..config import settings_instance
-from ..services import get_redis_service
-from ..utils import get_logger
+from hsl_common import get_settings_instance, get_logger_instance
+from hsl_common.kafka_service import get_redis_service
+from ..shared_lib.hsl_common import get_redis_service
 
-logger = get_logger(__name__)
+settings_instance = get_settings_instance()
+logger = get_logger_instance(__name__)
 
 
 def create_app() -> Flask:
@@ -49,7 +50,7 @@ def create_app() -> Flask:
             except Exception as e:
                 logger.error(f"⚠️ Broadcasting error: {e}")
                 socketio.sleep(5)
-                
+
     socketio.start_background_task(periodic_broadcaster)
     logger.info("✅ Background broadcaster task scheduled")
 
@@ -99,4 +100,23 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    app = create_app()
+    from config import get_settings_instance
+    from utils import get_logger_instance
+
+    settings_instance = get_settings_instance()
+    logger = get_logger_instance(__name__)
+    logger.info(
+        f"🌐 Starting Flask server on {settings_instance.FLASK_HOST}:{settings_instance.FLASK_PORT}"
+    )
+
+    try:
+        app.socketio.run(
+            app,
+            host=settings_instance.FLASK_HOST,
+            port=settings_instance.FLASK_PORT,
+            debug=settings_instance.FLASK_DEBUG,
+            allow_unsafe_werkzeug=True,
+        )
+    except KeyboardInterrupt:
+        logger.warning("\n🛑 Web server stopped by user")

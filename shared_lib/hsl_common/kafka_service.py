@@ -1,14 +1,15 @@
 """Kafka service for message publishing"""
 
 import json
-import logging
 import time
 from typing import Optional, Callable
 
+from .settings import get_settings_instance
+from .logger import get_logger_instance
 from kafka import KafkaProducer
-from ..config import settings_instance
 
-logger = logging.getLogger(__name__)
+logger = get_logger_instance(__name__)
+settings_instance = get_settings_instance()
 
 
 class KafkaService:

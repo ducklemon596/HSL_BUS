@@ -1,6 +1,7 @@
 """Centralized configuration settings for HSL Bus system"""
 
 import os
+from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -38,9 +39,6 @@ class Settings:
     KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "hsl_bus")
 
     # Spark Configuration
-    SPARK_CHECKPOINT_PATH = os.getenv(
-        "SPARK_CHECKPOINT_PATH", "/tmp/spark-checkpoints/"
-    )
     SPARK_KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BROKER", "kafka:9092")
 
     # Flask Configuration
@@ -79,4 +77,11 @@ class Settings:
 
 
 # Default settings instance
-settings_instance = Settings()
+settings_instance: Optional[Settings] = None
+
+
+def get_settings_instance() -> Settings:
+    if settings_instance is None:
+        global settings_instance
+        settings_instance = Settings()
+    return settings_instance

@@ -1,13 +1,13 @@
 """Redis service for storing and retrieving bus data"""
 
 import json
-import logging
 from typing import Optional, Dict, Any
 import redis
+from .settings import get_settings_instance
+from .logger import get_logger_instance
 
-from ..config import settings_instance
-
-logger = logging.getLogger(__name__)
+settings_instance = get_settings_instance()
+logger = get_logger_instance(__name__)
 
 
 class RedisService:
@@ -83,7 +83,7 @@ class RedisService:
         """
         try:
             snapshot = {}
-            cursor = '0' 
+            cursor = "0"
 
             while True:
                 cursor, keys = self.redis_client.scan(cursor=cursor, count=1000)
@@ -93,37 +93,39 @@ class RedisService:
                     for key in keys:
                         # Dùng HGETALL để bê TOÀN BỘ các trường trong Hash ra (data, is_stuck, avg_speed...)
                         pipeline.hgetall(key)
-                    
+
                     # Trả về 1 mảng các Dictionary
-                    values = pipeline.execute() 
-                    
+                    values = pipeline.execute()
+
                     for key, hash_data in zip(keys, values):
-                        # hash_data lúc này trông như thế này: 
+                        # hash_data lúc này trông như thế này:
                         # {"data": '{"lat": 60.1, ...}', "is_stuck": "True", "window_avg_speed": "15.5", "tsi": "123"}
-                        
+
                         if hash_data and "data" in hash_data:
                             try:
                                 # 1. Mở gói cái chuỗi văn bản JSON bên trong trường "data"
                                 parsed_data = json.loads(hash_data["data"])
-                                
+
                                 # 2. Xử lý an toàn trạng thái is_stuck (chống lỗi None)
-                                raw_stuck = str(hash_data.get("is_stuck", "False")).lower()
+                                raw_stuck = str(
+                                    hash_data.get("is_stuck", "False")
+                                ).lower()
                                 is_stuck = True if raw_stuck == "true" else False
-                                
+
                                 # 3. Lắp ráp lại đúng chuẩn Schema JSON Frontend yêu cầu
                                 snapshot[key] = {
                                     "data": parsed_data,
                                     "tsi": hash_data.get("tsi"),
                                     "window_end_time": hash_data.get("window_end_time"),
                                     "avg_speed": hash_data.get("window_avg_speed"),
-                                    "is_stuck": is_stuck
+                                    "is_stuck": is_stuck,
                                 }
                             except json.JSONDecodeError:
                                 logger.warning(f"Invalid JSON for key {key}")
-                                continue     
+                                continue
 
                 # ĐIỀU KIỆN DỪNG PHẢI ĐẶT Ở CUỐI CÙNG (Sau khi đã xử lý hết keys)
-                if cursor == 0 or cursor == '0' or cursor == b'0':
+                if cursor == 0 or cursor == "0" or cursor == b"0":
                     break
 
             return snapshot

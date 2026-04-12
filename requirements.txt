@@ -1,6 +1,0 @@
-flask
-flask-socketio
-redis
-python-dotenv
-paho-mqtt
-kafka-python

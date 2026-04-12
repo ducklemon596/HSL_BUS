@@ -32,12 +32,11 @@ from pyspark.sql.types import (
     IntegerType,
 )
 from delta.tables import DeltaTable
-import redis
 
-from ..config import settings_instance
-from ..utils import get_logger
+from hsl_common import get_settings_instance, get_logger_instance
 
-logger = get_logger(__name__)
+logger = get_logger_instance(__name__)
+settings_instance = get_settings_instance()
 
 
 class SparkWorker:
