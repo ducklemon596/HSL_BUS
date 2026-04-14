@@ -7,8 +7,8 @@ import ssl
 from hsl_common import get_settings_instance, get_logger_instance
 from hsl_common.kafka_service import get_kafka_service
 
-settings_instance = get_settings_instance()
 logger = get_logger_instance(__name__)
+settings_instance = get_settings_instance()
 
 
 class MQTTToKafkaIngestion:

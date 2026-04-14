@@ -61,3 +61,4 @@ jobs:
               --restart always \
               -e KAFKA_BROKER="${{ env.KAFKA_BROKER }}" \
               ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:latest
+            docker image prune -f
