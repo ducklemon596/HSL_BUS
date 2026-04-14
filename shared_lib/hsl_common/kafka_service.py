@@ -7,6 +7,7 @@ from typing import Optional, Callable
 from .settings import get_settings_instance
 from .logger import get_logger_instance
 from kafka import KafkaProducer
+from kafka.errors import NoBrokersAvailable
 
 logger = get_logger_instance(__name__)
 settings_instance = get_settings_instance()
@@ -15,43 +16,48 @@ settings_instance = get_settings_instance()
 class KafkaService:
     """Service for managing Kafka producer operations"""
 
-    def __init__(self, max_retries: int = 5, retry_delay: int = 5):
+    def __init__(self, retry_delay: int = 5):
         """
-        Initialize Kafka producer with retry logic
+        Initialize Kafka producer with resilient retry logic
 
         Args:
-            max_retries: Maximum number of connection attempts
-            retry_delay: Delay in seconds between retries
+            retry_delay: Delay in seconds between connection retries
         """
-        self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.producer = self._create_producer()
 
     def _create_producer(self) -> KafkaProducer:
-        """Create Kafka producer with retry logic"""
-        for attempt in range(self.max_retries):
+        """Create Kafka producer with infinite retry and fail-fast logic"""
+        attempt = 1
+
+        while True:
             try:
+                logger.info(f"⏳ Initializing Kafka connection (Attempt: {attempt})...")
+
                 producer = KafkaProducer(
                     bootstrap_servers=settings_instance.KAFKA_BROKER,
                     value_serializer=lambda v: json.dumps(v).encode("utf-8"),
                     key_serializer=lambda k: str(k).encode("utf-8"),
+                    max_block_ms=5000,
+                    api_version=(2, 5, 0),
                 )
+
                 logger.info(
-                    f"✅ Connected to Kafka at {settings_instance.KAFKA_BROKER}"
+                    f"✅ Successfully connected to Kafka at {settings_instance.KAFKA_BROKER}"
                 )
                 return producer
+
+            except NoBrokersAvailable as e:
+                logger.warning(
+                    f"⚠️ No brokers available. Retrying in {self.retry_delay} seconds..."
+                )
             except Exception as e:
-                if attempt < self.max_retries - 1:
-                    logger.warning(
-                        f"❌ Kafka connection failed (attempt {attempt + 1}/{self.max_retries}): {e}. "
-                        f"Retrying in {self.retry_delay} seconds..."
-                    )
-                    time.sleep(self.retry_delay)
-                else:
-                    logger.error(
-                        f"❌ Failed to connect to Kafka after {self.max_retries} attempts"
-                    )
-                    raise
+                logger.warning(
+                    f"❌ Error connecting to Kafka: {e}. Retrying in {self.retry_delay} seconds..."
+                )
+
+            time.sleep(self.retry_delay)
+            attempt += 1
 
     def send_message(
         self,
@@ -61,16 +67,7 @@ class KafkaService:
         on_success: Optional[Callable] = None,
         on_error: Optional[Callable] = None,
     ) -> None:
-        """
-        Send message to Kafka
-
-        Args:
-            value: Dictionary to be serialized and sent
-            key: Message key for partitioning
-            topic: Kafka topic (uses default if not provided)
-            on_success: Callback function on successful send
-            on_error: Callback function on error
-        """
+        """Send message to Kafka"""
         if topic is None:
             topic = settings_instance.KAFKA_TOPIC
 
@@ -87,12 +84,7 @@ class KafkaService:
                 on_error(e)
 
     def flush(self, timeout: int = 30) -> None:
-        """
-        Flush pending messages
-
-        Args:
-            timeout: Timeout in seconds
-        """
+        """Flush pending messages"""
         try:
             self.producer.flush(timeout)
             logger.debug(f"Flushed messages (timeout: {timeout}s)")

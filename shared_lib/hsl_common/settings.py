@@ -43,7 +43,7 @@ class Settings:
 
     # Flask Configuration
     FLASK_DEBUG = os.getenv("FLASK_DEBUG", "True").lower() == "true"
-    FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))
+    FLASK_PORT = int(os.getenv("FLASK_PORT", 8080))
     FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
 
     # Logging Configuration
@@ -81,7 +81,7 @@ settings_instance: Optional[Settings] = None
 
 
 def get_settings_instance() -> Settings:
+    global settings_instance
     if settings_instance is None:
-        global settings_instance
         settings_instance = Settings()
     return settings_instance

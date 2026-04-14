@@ -5,7 +5,6 @@ from flask_socketio import SocketIO
 
 from hsl_common import get_settings_instance, get_logger_instance
 from hsl_common.kafka_service import get_redis_service
-from ..shared_lib.hsl_common import get_redis_service
 
 settings_instance = get_settings_instance()
 logger = get_logger_instance(__name__)
@@ -101,8 +100,6 @@ def main():
 
 if __name__ == "__main__":
     app = create_app()
-    from config import get_settings_instance
-    from utils import get_logger_instance
 
     settings_instance = get_settings_instance()
     logger = get_logger_instance(__name__)

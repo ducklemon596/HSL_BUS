@@ -1,6 +1,7 @@
 """Redis service for storing and retrieving bus data"""
 
 import json
+import time
 from typing import Optional, Dict, Any
 import redis
 from .settings import get_settings_instance
@@ -13,8 +14,11 @@ logger = get_logger_instance(__name__)
 class RedisService:
     """Service for managing Redis operations"""
 
-    def __init__(self):
-        """Initialize Redis connection"""
+    def __init__(self, max_retries: int = 5, retry_delay: int = 3):
+        """Initialize Redis connection with Connection Pool and Retry logic"""
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+
         redis_pool = redis.ConnectionPool(
             host=settings_instance.REDIS_HOST,
             port=settings_instance.REDIS_PORT,
@@ -27,93 +31,77 @@ class RedisService:
         self._test_connection()
 
     def _test_connection(self) -> None:
-        """Test Redis connection"""
+        """Test Redis connection with retry mechanism"""
+        for attempt in range(self.max_retries):
+            try:
+                self.redis_client.ping()
+                logger.info(
+                    f"✅ Connected to Redis at {settings_instance.REDIS_HOST}:{settings_instance.REDIS_PORT}"
+                )
+                return
+            except Exception as e:
+                if attempt < self.max_retries - 1:
+                    logger.warning(
+                        f"⚠️ Redis didn't respond (Attempt {attempt + 1}). Retrying in {self.retry_delay}s..."
+                    )
+                    time.sleep(self.retry_delay)
+                else:
+                    logger.error(f"❌ Failed to connect to Redis: {e}")
+                    raise
+
+    def set_bus_data(self, bus_id: str, data: Dict[str, Any], ttl: int = 600) -> bool:
+        """Store bus data as Redis HASH"""
         try:
-            self.redis_client.ping()
-            logger.info(
-                f"✅ Connected to Redis at {settings_instance.REDIS_HOST}:{settings_instance.REDIS_PORT}"
-            )
-        except Exception as e:
-            logger.error(f"❌ Redis connection failed: {e}")
-            raise
-
-    def set_bus_data(self, bus_id: str, data: Dict[str, Any], ttl: int = 60) -> bool:
-        """
-        Store bus data in Redis with TTL
-
-        Args:
-            bus_id: Unique vehicle ID
-            data: Bus data dictionary
-            ttl: Time to live in seconds
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            value = json.dumps(data)
-            self.redis_client.set(bus_id, value, ex=ttl)
+            key = f"bus:{bus_id}"
+            self.redis_client.hset(key, mapping=data)
+            self.redis_client.expire(key, ttl)
             return True
         except Exception as e:
             logger.error(f"❌ Error setting bus data: {e}")
             return False
 
     def get_bus_data(self, bus_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieve bus data from Redis
-
-        Args:
-            bus_id: Unique vehicle ID
-
-        Returns:
-            Bus data dictionary or None if not found
-        """
+        """Retrieve bus data from Redis"""
         try:
-            value = self.redis_client.get(bus_id)
-            if value:
-                return json.loads(value)
-            return None
+            key = f"bus:{bus_id}"
+            hash_data = self.redis_client.hgetall(key)
+            if not hash_data:
+                return None
+            return hash_data
         except Exception as e:
             logger.error(f"❌ Error getting bus data: {e}")
             return None
 
     def get_all_buses(self) -> dict:
-        """
-        Retrieve all bus data currently in Redis
-        Returns: Dictionary with all bus data
-        """
+        """Retrieve all bus data currently in Redis using SCAN and PIPELINE"""
         try:
             snapshot = {}
-            cursor = "0"
+            cursor = 0
 
             while True:
-                cursor, keys = self.redis_client.scan(cursor=cursor, count=1000)
+                cursor, keys = self.redis_client.scan(
+                    cursor=cursor, match="bus:*", count=1000
+                )
 
                 if keys:
                     pipeline = self.redis_client.pipeline()
                     for key in keys:
-                        # Dùng HGETALL để bê TOÀN BỘ các trường trong Hash ra (data, is_stuck, avg_speed...)
                         pipeline.hgetall(key)
 
-                    # Trả về 1 mảng các Dictionary
                     values = pipeline.execute()
 
                     for key, hash_data in zip(keys, values):
-                        # hash_data lúc này trông như thế này:
-                        # {"data": '{"lat": 60.1, ...}', "is_stuck": "True", "window_avg_speed": "15.5", "tsi": "123"}
+                        clean_bus_id = key.replace("bus:", "")
 
                         if hash_data and "data" in hash_data:
                             try:
-                                # 1. Mở gói cái chuỗi văn bản JSON bên trong trường "data"
                                 parsed_data = json.loads(hash_data["data"])
-
-                                # 2. Xử lý an toàn trạng thái is_stuck (chống lỗi None)
                                 raw_stuck = str(
                                     hash_data.get("is_stuck", "False")
                                 ).lower()
                                 is_stuck = True if raw_stuck == "true" else False
 
-                                # 3. Lắp ráp lại đúng chuẩn Schema JSON Frontend yêu cầu
-                                snapshot[key] = {
+                                snapshot[clean_bus_id] = {
                                     "data": parsed_data,
                                     "tsi": hash_data.get("tsi"),
                                     "window_end_time": hash_data.get("window_end_time"),
@@ -124,8 +112,7 @@ class RedisService:
                                 logger.warning(f"Invalid JSON for key {key}")
                                 continue
 
-                # ĐIỀU KIỆN DỪNG PHẢI ĐẶT Ở CUỐI CÙNG (Sau khi đã xử lý hết keys)
-                if cursor == 0 or cursor == "0" or cursor == b"0":
+                if cursor == 0:
                     break
 
             return snapshot
@@ -134,18 +121,10 @@ class RedisService:
             return {}
 
     def delete_bus_data(self, bus_id: str) -> bool:
-        """
-        Delete bus data from Redis
-
-        Args:
-            bus_id: Unique vehicle ID
-
-        Returns:
-            True if successful, False otherwise
-        """
+        """Delete bus data from Redis"""
         try:
             key = f"bus:{bus_id}"
-            self.client.delete(key)
+            self.redis_client.delete(key)
             return True
         except Exception as e:
             logger.error(f"❌ Error deleting bus data: {e}")
@@ -154,7 +133,7 @@ class RedisService:
     def close(self) -> None:
         """Close Redis connection"""
         try:
-            self.client.close()
+            self.redis_client.close()
             logger.info("Redis connection closed")
         except Exception as e:
             logger.error(f"❌ Error closing Redis connection: {e}")
