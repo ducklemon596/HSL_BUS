@@ -9,6 +9,12 @@ variable "region" {
   default     = "asia-southeast1"
 }
 
+variable "zone" {
+  description = "Deployment zone for Google Cloud resources"
+  type        = string
+  default     = "asia-southeast1-a"
+}
+
 variable "data_lake_bucket" {
   description = "Name of the bucket for storing data lake (bronze & silver)"
   type        = string

@@ -10,3 +10,4 @@ terraforms/.terraform/
 terraforms/.terraform.lock.hcl
 terraforms/terraform.tfstate
 terraforms/terraform.tfstate.backup
+*.txt
