@@ -49,6 +49,7 @@ jobs:
           username: ${{ env.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
+            sudo chmod 666 /var/run/docker.sock
             # Xác thực lại docker trên VM
             gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
             # Xóa container cũ

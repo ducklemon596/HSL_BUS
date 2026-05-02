@@ -1,7 +1,6 @@
 """Apache Spark worker for real-time data processing"""
 
 import json
-import os
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import (
     current_timestamp,
@@ -79,61 +78,28 @@ class SparkWorker:
         logger.info("✅ Spark worker initialized")
 
     def _create_spark_session(self) -> SparkSession:
-        """Create Spark session with Kafka connector"""
+        """Create Spark session for Google Cloud Dataproc"""
         spark_version = "3.3.2"
-        kafka_package = f"org.apache.spark:spark-sql-kafka-0-10_2.12:{spark_version}"
+        delta_version = "2.3.0"
 
-        # Locate GCP credentials file
-        gcp_credentials = os.getenv("GCP_CREDENTIALS", "/app/credentials.json")
+        maven_packages = f"org.apache.spark:spark-sql-kafka-0-10_2.12:{spark_version},io.delta:delta-core_2.12:{delta_version}"
 
         spark = (
             SparkSession.builder.appName("HSL_Bus_Pipeline")
-            # Set timezone to UTC for timestamp consistency across different environments
-            # Timestamps in the data are in UTC, so we want Spark to interpret them as UTC to avoid timezone-related bugs
             .config("spark.sql.session.timeZone", "UTC")
-            # Allocate memory for driver and executors
-            .config("spark.driver.memory", "4g")
-            .config("spark.executor.memory", "4g")
-            # Configure GCS credentials for Spark to access GCS buckets
-            .config(
-                "spark.hadoop.google.cloud.auth.service.account.json.keyfile",
-                gcp_credentials,
-            )
-            # Configure GCS connector for bronze layer
-            .config(
-                "spark.jars.packages",
-                "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.5",
-            )
-            .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
-            .config(
-                "spark.hadoop.fs.gs.impl",
-                "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem",
-            )
-            # Configure GCS connector for delta lake (silver layer)
-            .config(
-                "spark.hadoop.fs.AbstractFileSystem.gs.impl",
-                "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS",
-            )
-            .config(
-                "spark.jars.packages",
-                "io.delta:delta-core_2.12:2.3.0,com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.5",
-            )
+            .config("spark.jars.packages", maven_packages)
             .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
             .config(
                 "spark.sql.catalog.spark_catalog",
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog",
             )
-            # Optimize for streaming writes to Delta Lake in GCS
             .config("spark.databricks.delta.optimizeWrite.enabled", "true")
             .config("spark.databricks.delta.autoCompact.enabled", "true")
-            # Configure Kafka package for streaming from Kafka
-            .config("spark.jars.packages", kafka_package)
             .getOrCreate()
         )
 
-        # Set log level to WARN to reduce verbosity
-        spark.sparkContext.setLogLevel("ERROR")
-        logger.info("👷 Spark Session created")
+        spark.sparkContext.setLogLevel("WARN")
+        logger.info("👷 Spark Session created for Dataproc")
         return spark
 
     def _read_from_kafka(self, starting_offsets="latest") -> DataFrame:

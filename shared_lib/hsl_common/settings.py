@@ -22,7 +22,7 @@ class Settings:
     )
 
     # Redis Configuration
-    REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+    REDIS_HOST = os.getenv("REDIS_HOST", "10.148.0.9")
     REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
     REDIS_DB = int(os.getenv("REDIS_DB", 0))
     REDIS_TIMEOUT = int(os.getenv("REDIS_TIMEOUT", 60))
@@ -35,11 +35,11 @@ class Settings:
     MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 
     # Kafka Configuration
-    KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka:9092")
+    KAFKA_BROKER = os.getenv("KAFKA_BROKER", "10.148.0.4:9092")
     KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "hsl_bus")
 
     # Spark Configuration
-    SPARK_KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BROKER", "kafka:9092")
+    SPARK_KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BROKER", "10.148.0.4:9092")
 
     # Flask Configuration
     FLASK_DEBUG = os.getenv("FLASK_DEBUG", "True").lower() == "true"
@@ -48,9 +48,6 @@ class Settings:
 
     # Logging Configuration
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-    LOG_FILE = os.getenv("LOG_FILE", "logs/pipeline.log")
-    LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", 5 * 1024 * 1024))
-    LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", 10))
 
     # Geographic Data Validation
     LOCATION_LAT_MIN = float(os.getenv("LOCATION_LAT_MIN", 60.0))
