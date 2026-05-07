@@ -1,13 +1,18 @@
+# Hiding sensitive files 
 .env
 credentials.json
+
+# Ignoring Python cache and logs
 __pycache__/
-hsl/
 checkpoints/
 logs/
-*.docx
-shared_logic.zip
+
+# Ignoring Terraform state files and lock files
+terraforms/shared_logic.zip
 terraforms/.terraform/
 terraforms/.terraform.lock.hcl
 terraforms/terraform.tfstate
 terraforms/terraform.tfstate.backup
+
+# Ignoring any text files
 *.txt

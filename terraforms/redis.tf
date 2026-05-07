@@ -1,4 +1,6 @@
-# 1. Tạo máy ảo Redis
+/*
+    Create a Redis server running on e2-micro instance
+*/
 resource "google_compute_instance" "redis_server" {
   name         = "hsl-redis-server"
   machine_type = "e2-micro"
@@ -14,7 +16,7 @@ resource "google_compute_instance" "redis_server" {
 
   network_interface {
     network = "default"
-    access_config {} # Cấp IP Public
+    access_config {} # public IP when VM is running
   }
 
   # Dùng hàm replace để ép xóa bỏ ký tự \r của Windows
