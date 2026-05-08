@@ -9,14 +9,18 @@ logger = get_logger_instance(__name__)
 settings_instance = get_settings_instance()
 
 
-def _get_redis_client():
+def _get_redis_client(redis_host=None, redis_port=None, redis_password=None):
     import redis
+
+    host = redis_host or settings_instance.REDIS_HOST
+    port = redis_port or settings_instance.REDIS_PORT
+    password = redis_password or getattr(settings_instance, "REDIS_PASSWORD", None)
 
     if not hasattr(redis, "_my_global_client"):
         pool = redis.ConnectionPool(
-            host=settings_instance.REDIS_HOST,
-            port=settings_instance.REDIS_PORT,
-            password=getattr(settings_instance, "REDIS_PASSWORD", None),
+            host=host,
+            port=port,
+            password=password,
             decode_responses=True,
             max_connections=10,
         )
@@ -25,7 +29,9 @@ def _get_redis_client():
     return redis._my_global_client
 
 
-def _process_position_partition(iterator):
+def _process_position_partition(
+    iterator, redis_host=None, redis_port=None, redis_password=None
+):
     try:
         first_row = next(iterator)
     except StopIteration:
@@ -33,7 +39,7 @@ def _process_position_partition(iterator):
 
     from itertools import chain
 
-    redis_client = _get_redis_client()
+    redis_client = _get_redis_client(redis_host, redis_port, redis_password)
 
     LUA_POSITION_SCRIPT = """
     local bus_key = KEYS[1]
@@ -71,15 +77,27 @@ def _process_position_partition(iterator):
             pipe.execute()
 
 
-def write_position_to_redis(batch_df: DataFrame, batch_id: int):
+def write_position_to_redis(
+    batch_df: DataFrame,
+    batch_id: int,
+    redis_host=None,
+    redis_port=None,
+    redis_password=None,
+):
     try:
-        batch_df.foreachPartition(_process_position_partition)
+        batch_df.foreachPartition(
+            lambda iterator: _process_position_partition(
+                iterator, redis_host, redis_port, redis_password
+            )
+        )
         logger.info(f"💾 Batch {batch_id}: Dispatched writes to Redis via Workers")
     except Exception as exc:
         logger.error(f"❌ Error dispatching Redis writes: {exc}")
 
 
-def _process_speed_partition(iterator):
+def _process_speed_partition(
+    iterator, redis_host=None, redis_port=None, redis_password=None
+):
     try:
         first_row = next(iterator)
     except StopIteration:
@@ -87,7 +105,7 @@ def _process_speed_partition(iterator):
 
     from itertools import chain
 
-    redis_client = _get_redis_client()
+    redis_client = _get_redis_client(redis_host, redis_port, redis_password)
 
     LUA_TRAFFIC_SCRIPT = """
     local bus_key = KEYS[1]
@@ -133,7 +151,13 @@ def _process_speed_partition(iterator):
             pipe.execute()
 
 
-def write_speed_avg_to_redis(batch_df: DataFrame, batch_id: int):
+def write_speed_avg_to_redis(
+    batch_df: DataFrame,
+    batch_id: int,
+    redis_host=None,
+    redis_port=None,
+    redis_password=None,
+):
     window_spec = SparkWindow.partitionBy("unique_veh_id").orderBy(
         col("window_end").desc()
     )
@@ -143,7 +167,11 @@ def write_speed_avg_to_redis(batch_df: DataFrame, batch_id: int):
         .drop("row_num")
     )
     try:
-        final_df.foreachPartition(_process_speed_partition)
+        final_df.foreachPartition(
+            lambda iterator: _process_speed_partition(
+                iterator, redis_host, redis_port, redis_password
+            )
+        )
         logger.info(
             f"💾 Batch {batch_id}: Dispatched speed averages to Redis via Workers"
         )
@@ -151,7 +179,9 @@ def write_speed_avg_to_redis(batch_df: DataFrame, batch_id: int):
         logger.error(f"❌ Error dispatching speed averages writes: {exc}")
 
 
-def write_position_to_redis_query(clean_df: DataFrame):
+def write_position_to_redis_query(
+    clean_df: DataFrame, redis_host=None, redis_port=None, redis_password=None
+):
     return (
         clean_df.select(
             "unique_veh_id",
@@ -163,14 +193,20 @@ def write_position_to_redis_query(clean_df: DataFrame):
             "hdg",
             "desi",
         )
-        .writeStream.foreachBatch(write_position_to_redis)
+        .writeStream.foreachBatch(
+            lambda batch_df, batch_id: write_position_to_redis(
+                batch_df, batch_id, redis_host, redis_port, redis_password
+            )
+        )
         .outputMode("update")
         .trigger(processingTime="1 second")
         .start()
     )
 
 
-def write_speed_avg_to_redis_query(clean_df: DataFrame):
+def write_speed_avg_to_redis_query(
+    clean_df: DataFrame, redis_host=None, redis_port=None, redis_password=None
+):
     return (
         clean_df.withWatermark("tst", "1 minute")
         .groupBy(window(col("tst"), "5 minute", "1 minute"), col("unique_veh_id"))
@@ -188,7 +224,11 @@ def write_speed_avg_to_redis_query(clean_df: DataFrame):
                 "observed_duration_seconds"
             ),
         )
-        .writeStream.foreachBatch(write_speed_avg_to_redis)
+        .writeStream.foreachBatch(
+            lambda batch_df, batch_id: write_speed_avg_to_redis(
+                batch_df, batch_id, redis_host, redis_port, redis_password
+            )
+        )
         .outputMode("update")
         .trigger(processingTime="10 seconds")
         .start()

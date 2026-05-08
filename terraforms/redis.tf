@@ -1,10 +1,8 @@
-/*
-    Create a Redis server running on e2-micro instance
-*/
+# 1. Tạo máy ảo Redis Server
 resource "google_compute_instance" "redis_server" {
   name         = "hsl-redis-server"
   machine_type = "e2-micro"
-  zone         = var.zone
+  zone         = "asia-southeast1-a" # Đảm bảo cùng khu vực với Dataproc
 
   boot_disk {
     initialize_params {
@@ -16,26 +14,37 @@ resource "google_compute_instance" "redis_server" {
 
   network_interface {
     network = "default"
-    access_config {} # public IP when VM is running
+    
+    # Vẫn giữ access_config để lấy Public IP cho bạn dễ debug từ máy cá nhân
+    access_config {} 
   }
 
-  # Dùng hàm replace để ép xóa bỏ ký tự \r của Windows
+  # Startup script tự động cài đặt và cấu hình
+  # Dùng <<-EOF (có dấu trừ) để Terraform tự động format thụt lề chuẩn xác
   metadata_startup_script = replace(<<-EOF
     #!/bin/bash
+    set -e
+    
+    # Cập nhật và cài đặt Redis
     apt-get update
     apt-get install -y redis-server
-    sed -i 's/bind 127.0.0.1 -::1/bind 0.0.0.0/g' /etc/redis/redis.conf
-    sed -i 's/protected-mode yes/protected-mode no/g' /etc/redis/redis.conf
+    
+    # Dùng Regex thay thế toàn bộ dòng bắt đầu bằng chữ 'bind' và 'protected-mode'
+    sed -i 's/^bind .*/bind 0.0.0.0/' /etc/redis/redis.conf
+    sed -i 's/^protected-mode yes/protected-mode no/' /etc/redis/redis.conf
+    
+    # Khởi động lại dịch vụ để ăn cấu hình mới
     systemctl restart redis-server
   EOF
   , "\r", "")
 
-  tags = ["allow-redis"]
+  # Gắn thẻ để Tường lửa nhận diện
+  tags = ["allow-redis-internal"]
 }
 
-# 2. Tạo tường lửa mở cổng 6379
+# 2. Tường lửa CHỈ mở cho mạng nội bộ VPC (Bảo mật tuyệt đối)
 resource "google_compute_firewall" "allow_redis" {
-  name    = "hsl-allow-redis-port"
+  name    = "hsl-allow-redis-internal"
   network = "default"
 
   allow {
@@ -43,11 +52,22 @@ resource "google_compute_firewall" "allow_redis" {
     ports    = ["6379"]
   }
 
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["allow-redis"]
+  source_tags = ["bus-dataproc-node"]
+  target_tags   = ["allow-redis-internal"]
 }
 
-# 3. In ra màn hình IP Public để bạn sử dụng
+# =====================================================================
+# 3. KẾT QUẢ ĐẦU RA (DÙNG CHO TỰ ĐỘNG HÓA)
+# =====================================================================
+
+# IP NỘI BỘ: Đây là "Trái tim" của sự tự động hóa. Dataproc sẽ dùng IP này.
+output "redis_internal_ip" {
+  description = "IP Nội bộ để Dataproc kết nối tốc độ cao"
+  value       = google_compute_instance.redis_server.network_interface[0].network_ip
+}
+
+# IP PUBLIC: Chỉ dùng cho bạn mở phần mềm Redis Insight trên máy cá nhân để soi data
 output "redis_public_ip" {
-  value = google_compute_instance.redis_server.network_interface[0].access_config[0].nat_ip
+  description = "IP Public để debug (Sẽ không vào được nếu bạn không kết nối VPN GCP)"
+  value       = google_compute_instance.redis_server.network_interface[0].access_config[0].nat_ip
 }

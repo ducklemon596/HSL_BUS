@@ -4,8 +4,8 @@ import json
 import paho.mqtt.client as mqtt
 import ssl
 
-from hsl_common import get_settings_instance, get_logger_instance
-from hsl_common.kafka_service import get_kafka_service
+from shared_lib import get_settings_instance, get_logger_instance
+from shared_lib import get_kafka_service
 
 logger = get_logger_instance(__name__)
 settings_instance = get_settings_instance()

@@ -55,7 +55,7 @@ resource "google_storage_bucket" "data_lake" {
   labels = local.data_lake_labels
 
   uniform_bucket_level_access = true
-  public_access_prevention = "enforced"
+  public_access_prevention    = "enforced"
 
   # Enable versioning for data protection
   versioning {
@@ -110,7 +110,7 @@ resource "google_storage_bucket" "spark_worker_assets" {
   labels = local.spark_worker_labels
 
   uniform_bucket_level_access = true
-  public_access_prevention = "enforced"
+  public_access_prevention    = "enforced"
 
   versioning {
     enabled = var.enable_versioning
@@ -166,14 +166,14 @@ data "archive_file" "source_code_zip" {
  * Upload shared logic library to Spark Worker Assets bucket
  * Makes common code available to all Spark workers
  */
-resource "google_storage_object" "upload_shared_logic" {
+resource "google_storage_bucket_object" "upload_shared_logic" {
   name   = var.source_code_artifacts.shared_logic_path
   bucket = google_storage_bucket.spark_worker_assets.name
   source = data.archive_file.shared_logic_zip.output_path
 
   depends_on = [
     data.archive_file.shared_logic_zip,
-    google_storage_object.libs_folder
+    google_storage_bucket_object.libs_folder
   ]
 }
 
@@ -181,12 +181,12 @@ resource "google_storage_object" "upload_shared_logic" {
  * Upload main Spark worker script
  * Entry point for Spark job execution
  */
-resource "google_storage_object" "upload_main_script" {
+resource "google_storage_bucket_object" "upload_main_script" {
   name   = var.source_code_artifacts.main_script_path
   bucket = google_storage_bucket.spark_worker_assets.name
   source = "${path.module}/../${var.source_code_folder}/run_spark_worker.py"
 
-  depends_on = [google_storage_object.code_folder]
+  depends_on = [google_storage_bucket_object.code_folder]
 }
 
 /**
@@ -208,12 +208,12 @@ resource "google_storage_object" "upload_src_zip" {
  * Upload setup environment script for Dataproc initialization
  * Used as startup script to install dependencies and configure Spark environment
  */
-resource "google_storage_object" "upload_setup_script" {
+resource "google_storage_bucket_object" "upload_setup_script" {
   name   = var.source_code_artifacts.setup_script_path
   bucket = google_storage_bucket.spark_worker_assets.name
   source = "${path.module}/../${var.source_code_folder}/setup_env.sh"
 
-  depends_on = [google_storage_object.code_folder]
+  depends_on = [google_storage_bucket_object.code_folder]
 }
 
 # ============================================================================
@@ -243,10 +243,10 @@ output "spark_worker_bucket_url" {
 output "artifact_paths" {
   description = "Paths to uploaded artifacts in Spark worker bucket"
   value = {
-    shared_logic = google_storage_object.upload_shared_logic.name
-    main_script  = google_storage_object.upload_main_script.name
-    source_code  = google_storage_object.upload_src_zip.name
-    setup_script = google_storage_object.upload_setup_script.name
+    shared_logic = google_storage_bucket_object.upload_shared_logic.name
+    main_script  = google_storage_bucket_object.upload_main_script.name
+    source_code  = google_storage_bucket_object.upload_src_zip.name
+    setup_script = google_storage_bucket_object.upload_setup_script.name
   }
 }
 

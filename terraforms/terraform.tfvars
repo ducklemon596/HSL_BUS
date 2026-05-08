@@ -1,16 +1,16 @@
-project_id            = "hsl-bus-streaming-495014"
-environment           = "dev"
-region                = "asia-southeast1"
-zone                  = "asia-southeast1-a"
-data_lake_bucket      = "hsl-bus-data-lake"
-spark_worker_bucket   = "hsl-bus-spark-worker"
+project_id          = "hsl-bus-streaming-495014"
+environment         = "dev"
+region              = "asia-southeast1"
+zone                = "asia-southeast1-a"
+data_lake_bucket    = "hsl-bus-data-lake"
+spark_worker_bucket = "hsl-bus-spark-worker"
 
-bucket_storage_class  = "STANDARD"
-enable_versioning     = true
-force_destroy_bucket  = true # Set to false in production
+bucket_storage_class = "STANDARD"
+enable_versioning    = true
+force_destroy_bucket = true # Set to false in production
 
-shared_logic_folder   = "shared_lib"
-source_code_folder    = "spark_service/src"
+shared_logic_folder = "shared_lib"
+source_code_folder  = "spark_service/src"
 
 resource_labels = {
   project    = "hsl-bus-streaming"
@@ -19,8 +19,8 @@ resource_labels = {
 }
 
 bucket_folders = {
-  libs    = "libs"
-  code    = "code"
+  libs = "libs"
+  code = "code"
 }
 
 source_code_artifacts = {
@@ -29,3 +29,35 @@ source_code_artifacts = {
   source_code_path  = "code/src.zip"
   setup_script_path = "scripts/setup_env.sh"
 }
+
+# ============================================================================
+# KAFKA CONFIGURATION
+# ============================================================================
+# kafka_partition_count: Number of partitions for the Kafka topic (8 partitions)
+kafka_partition_count = 8
+# kafka_replication_factor: Replication factor ensures 3 copies of each message
+kafka_replication_factor = 3
+
+# ============================================================================
+# INGESTION SERVICE VM CONFIGURATION
+# ============================================================================
+# Small VM instance for MQTT to Kafka ingestion service
+ingestion_vm_machine_type = "e2-micro"  # Small, cost-efficient instance
+ingestion_vm_disk_size_gb = 20          # Boot disk size
+ingestion_vm_disk_type    = "pd-standard"
+
+# ============================================================================
+# CLOUD RUN APP SERVICE CONFIGURATION
+# ============================================================================
+# Docker image for the web application service
+app_service_image = "gcr.io/hsl-bus-streaming-495014/hsl-bus-web:latest"
+# Memory: 512MB provides good balance for Flask SocketIO app
+cloud_run_memory = "512Mi"
+# CPU: 1 CPU sufficient for lightweight web app
+cloud_run_cpu = 1
+# Timeout: 1 hour max request timeout
+cloud_run_timeout_seconds = 3600
+# Min instances: 0 = auto-scale to zero when no requests (cost savings)
+cloud_run_min_instances = 0
+# Max instances: Scale up to 100 for high load
+cloud_run_max_instances = 100

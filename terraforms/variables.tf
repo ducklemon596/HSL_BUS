@@ -89,20 +89,20 @@ variable "resource_labels" {
   description = "Common labels to apply to all resources"
   type        = map(string)
   default = {
-    project     = "hsl-bus-streaming"
-    managed_by  = "terraform"
+    project    = "hsl-bus-streaming"
+    managed_by = "terraform"
   }
 }
 
 variable "bucket_folders" {
   description = "Structure of folders to create in spark worker bucket"
   type = object({
-    libs    = string
-    code    = string
+    libs = string
+    code = string
   })
   default = {
-    libs    = "libs"
-    code    = "code"
+    libs = "libs"
+    code = "code"
   }
 }
 
@@ -120,4 +120,171 @@ variable "source_code_artifacts" {
     source_code_path  = "code/src.zip"
     setup_script_path = "scripts/setup_env.sh"
   }
-}  
+}
+
+variable "spark_job_jars_packages" {
+  description = "Comma-separated Spark packages required by the Dataproc job"
+  type        = string
+  default     = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,com.google.cloud.hosted.kafka:managed-kafka-auth-login-handler:1.0.6"
+}
+
+variable "kafka_cluster_id" {
+  description = "Managed Kafka cluster identifier"
+  type        = string
+  default     = "hsl-bus-kafka-cluster"
+  validation {
+    condition     = length(var.kafka_cluster_id) > 0
+    error_message = "Kafka cluster id cannot be empty."
+  }
+}
+
+variable "kafka_topic_id" {
+  description = "Managed Kafka topic identifier"
+  type        = string
+  default     = "hsl-bus-stream"
+  validation {
+    condition     = length(var.kafka_topic_id) > 0
+    error_message = "Kafka topic id cannot be empty."
+  }
+}
+
+variable "kafka_location" {
+  description = "Deployment region for Kafka resources, falls back to var.region if unset"
+  type        = string
+  default     = ""
+}
+
+variable "kafka_subnet_name" {
+  description = "Name of the subnet to attach Kafka resources to"
+  type        = string
+  default     = "default"
+}
+
+variable "kafka_vcpu_count" {
+  description = "Number of vCPUs for the Kafka cluster"
+  type        = number
+  default     = 3
+  validation {
+    condition     = var.kafka_vcpu_count > 0
+    error_message = "Kafka vCPU count must be greater than zero."
+  }
+}
+
+variable "kafka_memory_bytes" {
+  description = "Memory size for the Kafka cluster in bytes"
+  type        = number
+  default     = 12884901888
+  validation {
+    condition     = var.kafka_memory_bytes > 0
+    error_message = "Kafka memory_bytes must be greater than zero."
+  }
+}
+
+variable "kafka_partition_count" {
+  description = "Number of partitions for the Kafka topic"
+  type        = number
+  default     = 8
+  validation {
+    condition     = var.kafka_partition_count > 0
+    error_message = "Kafka partition count must be greater than zero."
+  }
+}
+
+variable "kafka_replication_factor" {
+  description = "Replication factor for the Kafka topic"
+  type        = number
+  default     = 3
+  validation {
+    condition     = var.kafka_replication_factor > 0
+    error_message = "Kafka replication factor must be greater than zero."
+  }
+}
+
+# ============================================================================
+# INGESTION SERVICE VM CONFIGURATION
+# ============================================================================
+
+variable "ingestion_vm_machine_type" {
+  description = "Machine type for ingestion service VM (small, cost-efficient)"
+  type        = string
+  default     = "e2-micro"
+}
+
+variable "ingestion_vm_disk_size_gb" {
+  description = "Boot disk size in GB for ingestion VM"
+  type        = number
+  default     = 20
+  validation {
+    condition     = var.ingestion_vm_disk_size_gb > 0
+    error_message = "Disk size must be greater than zero."
+  }
+}
+
+variable "ingestion_vm_disk_type" {
+  description = "Boot disk type for ingestion VM"
+  type        = string
+  default     = "pd-standard"
+}
+
+# ============================================================================
+# CLOUD RUN APP SERVICE CONFIGURATION
+# ============================================================================
+
+variable "app_service_image" {
+  description = "Docker image URI for web app Cloud Run service"
+  type        = string
+  validation {
+    condition     = length(var.app_service_image) > 0
+    error_message = "App service image cannot be empty."
+  }
+}
+
+variable "cloud_run_memory" {
+  description = "Memory allocation for Cloud Run service (e.g., '256Mi', '512Mi', '1Gi')"
+  type        = string
+  default     = "512Mi"
+  validation {
+    condition     = contains(["128Mi", "256Mi", "512Mi", "1Gi", "2Gi", "4Gi"], var.cloud_run_memory)
+    error_message = "Memory must be one of: 128Mi, 256Mi, 512Mi, 1Gi, 2Gi, 4Gi."
+  }
+}
+
+variable "cloud_run_cpu" {
+  description = "CPU allocation for Cloud Run service"
+  type        = number
+  default     = 1
+  validation {
+    condition     = contains([1, 2, 4], var.cloud_run_cpu)
+    error_message = "CPU must be one of: 1, 2, 4."
+  }
+}
+
+variable "cloud_run_timeout_seconds" {
+  description = "Request timeout in seconds for Cloud Run service"
+  type        = number
+  default     = 3600
+  validation {
+    condition     = var.cloud_run_timeout_seconds > 0 && var.cloud_run_timeout_seconds <= 3600
+    error_message = "Timeout must be between 1 and 3600 seconds."
+  }
+}
+
+variable "cloud_run_min_instances" {
+  description = "Minimum number of instances for Cloud Run (0 = scale to zero when idle)"
+  type        = number
+  default     = 0
+  validation {
+    condition     = var.cloud_run_min_instances >= 0
+    error_message = "Min instances must be >= 0."
+  }
+}
+
+variable "cloud_run_max_instances" {
+  description = "Maximum number of instances for Cloud Run auto-scaling"
+  type        = number
+  default     = 100
+  validation {
+    condition     = var.cloud_run_max_instances > 0
+    error_message = "Max instances must be > 0."
+  }
+}

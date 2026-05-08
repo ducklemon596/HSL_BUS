@@ -5,8 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
-COPY shared_lib /app/shared_lib
-COPY web_service /app/web_service
+COPY ../shared_lib/ /app/shared_lib
+COPY . /app/web_service
 WORKDIR /app/web_service
 
 RUN pip install --no-cache-dir -r requirements.txt gunicorn

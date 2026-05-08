@@ -18,3 +18,10 @@ resource "google_project_iam_member" "storage_admin_role" {
   role    = "roles/storage.objectAdmin"
   member  = "serviceAccount:${google_service_account.spark_worker.email}"
 }
+
+# Kafka Admin role for Spark to consume from Kafka
+resource "google_project_iam_member" "spark_kafka_role" {
+  project = var.project_id
+  role    = "roles/managedkafka.admin"
+  member  = "serviceAccount:${google_service_account.spark_worker.email}"
+}

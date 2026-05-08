@@ -16,21 +16,26 @@ logger = get_logger_instance(__name__)
 class SparkWorker:
     """Orchestrates Spark streaming for bus data processing."""
 
-    def __init__(self):
+    def __init__(self, starting_offsets: str = "latest"):
         self.spark = create_spark_session()
+        self.starting_offsets = starting_offsets
         logger.info("✅ Spark worker initialized")
 
     def start(self):
         logger.info("🚀 Start streaming from Kafka...")
 
-        raw_df_for_streaming = read_from_kafka(self.spark, starting_offsets="latest")
+        REDIS_HOST = self.spark.conf.get("spark.hsl.redis.host", "localhost")
+
+        raw_df_for_streaming = read_from_kafka(
+            self.spark, starting_offsets=self.starting_offsets
+        )
         raw_df_for_storage = read_from_kafka(self.spark, starting_offsets="earliest")
 
         clean_df_for_streaming = clean_bus_data(raw_df_for_streaming)
         clean_df_for_storage = clean_bus_data(raw_df_for_storage)
 
-        write_position_to_redis_query(clean_df_for_streaming)
-        write_speed_avg_to_redis_query(clean_df_for_streaming)
+        write_position_to_redis_query(clean_df_for_streaming, redis_host=REDIS_HOST)
+        write_speed_avg_to_redis_query(clean_df_for_streaming, redis_host=REDIS_HOST)
 
         bronze_layer(raw_df_for_storage)
         silver_layer(clean_df_for_storage)

@@ -31,8 +31,8 @@ resource "google_dataproc_cluster" "spark_cluster" {
 
     # Initialization actions for cluster setup
     initialization_action {
-      script      = "gs://${google_storage_bucket.spark_worker_assets.name}/${google_storage_object.upload_setup_script.name}"
-      timeout_sec = 600  # 10 minutes timeout
+      script      = "gs://${google_storage_bucket.spark_worker_assets.name}/${google_storage_bucket_object.upload_setup_script.name}"
+      timeout_sec = 600 # 10 minutes timeout
     }
 
     # Service Account & IAM Scopes
@@ -41,6 +41,8 @@ resource "google_dataproc_cluster" "spark_cluster" {
       service_account_scopes = [
         "https://www.googleapis.com/auth/cloud-platform"
       ]
+
+      tags = ["bus-dataproc-node"]
     }
 
     # Enable component gateway (Spark UI, YARN)
