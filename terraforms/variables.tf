@@ -288,3 +288,105 @@ variable "cloud_run_max_instances" {
     error_message = "Max instances must be > 0."
   }
 }
+
+variable "network_name" {
+  description = "Name of the VPC network to deploy resources into"
+  type        = string
+  default     = "default"
+}
+
+variable "app_service_name" {
+  description = "Cloud Run service name for web application"
+  type        = string
+  default     = "hsl-bus-web-app"
+}
+
+variable "app_service_account_id" {
+  description = "Service account id for Cloud Run web application"
+  type        = string
+  default     = "hsl-app-service"
+}
+
+variable "app_vpc_connector_name" {
+  description = "VPC connector name for the Cloud Run web application"
+  type        = string
+  default     = "hsl-app-vpc-connector"
+}
+
+variable "app_vpc_cidr_range" {
+  description = "CIDR range assigned to the Cloud Run VPC connector"
+  type        = string
+  default     = "10.10.0.0/28"
+}
+
+variable "redis_port" {
+  description = "Redis service port"
+  type        = number
+  default     = 6379
+}
+
+variable "kafka_bootstrap_address" {
+  description = "Kafka bootstrap address for clients to connect"
+  type        = string
+  default     = ""
+}
+
+variable "kafka_broker_ports" {
+  description = "Ports used by Kafka brokers for ingestion and app connectivity"
+  type        = list(number)
+  default     = [9092, 9093, 9094]
+}
+
+variable "flask_host" {
+  description = "Host address for the Flask web application"
+  type        = string
+  default     = "0.0.0.0"
+}
+
+variable "flask_port" {
+  description = "Port for the Flask web application"
+  type        = number
+  default     = 8080
+}
+
+variable "ingestion_vm_image" {
+  description = "Boot image for the ingestion VM"
+  type        = string
+  default     = "ubuntu-os-cloud/ubuntu-2204-lts"
+}
+
+variable "mqtt_broker" {
+  description = "MQTT broker host for ingestion service"
+  type        = string
+  default     = "mqtt.hsl.fi"
+}
+
+variable "mqtt_port" {
+  description = "MQTT broker port for ingestion service"
+  type        = number
+  default     = 8883
+}
+
+variable "mqtt_topic" {
+  description = "MQTT topic subscription for ingestion service"
+  type        = string
+  default     = "/hfp/v2/journey/ongoing/vp/bus/#"
+}
+
+variable "ingestion_service_account_id" {
+  description = "Service account id for ingestion VM"
+  type        = string
+  default     = "hsl-ingestion-service"
+}
+
+variable "ingestion_vm_name" {
+  description = "Name of the ingestion VM"
+  type        = string
+  default     = "hsl-ingestion-vm"
+}
+
+variable "ingestion_firewall_name" {
+  description = "Firewall rule name for ingestion VM Kafka access"
+  type        = string
+  default     = "hsl-allow-ingestion-to-kafka"
+}

@@ -5,7 +5,7 @@
 
 # Service Account for Ingestion VM
 resource "google_service_account" "ingestion_service" {
-  account_id   = "hsl-ingestion-service"
+  account_id   = var.ingestion_service_account_id
   display_name = "Service Account for HSL Bus Ingestion"
   description  = "Service account for MQTT to Kafka ingestion service on VM"
 }
@@ -34,36 +34,36 @@ resource "google_project_iam_member" "ingestion_logging_role" {
 
 # Firewall rule to allow ingestion VM to connect to Kafka (port 9092 - Kafka broker)
 resource "google_compute_firewall" "allow_ingestion_to_kafka" {
-  name    = "hsl-allow-ingestion-to-kafka"
-  network = "default"
+  name    = var.ingestion_firewall_name
+  network = var.network_name
 
   allow {
     protocol = "tcp"
-    ports    = ["9092", "9093", "9094"]  # Kafka broker ports
+    ports    = [for port in var.kafka_broker_ports : tostring(port)] # Kafka broker ports
   }
 
   source_tags = ["hsl-ingestion-node"]
-  target_tags = []  # Applied to Kafka subnet resources
+  target_tags = [] # Applied to Kafka subnet resources
 
   depends_on = [google_managed_kafka_cluster.bus_kafka]
 }
 
 # Ingestion Service VM Instance
 resource "google_compute_instance" "ingestion_vm" {
-  name         = "hsl-ingestion-vm"
+  name         = var.ingestion_vm_name
   machine_type = var.ingestion_vm_machine_type
   zone         = var.zone
 
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-2204-lts"
+      image = var.ingestion_vm_image
       size  = var.ingestion_vm_disk_size_gb
       type  = var.ingestion_vm_disk_type
     }
   }
 
   network_interface {
-    network = "default"
+    network = var.network_name
     # Request internal IP only (private instance)
   }
 
@@ -92,11 +92,11 @@ resource "google_compute_instance" "ingestion_vm" {
     
     # Create environment file for ingestion service
     cat > /etc/environment.d/hsl-ingestion.sh <<ENVEOF
-    export KAFKA_BROKER="${google_managed_kafka_cluster.bus_kafka.bootstrap_config[0].vpc_configs[0].bootstrap_address}"
+    export KAFKA_BROKER="${var.kafka_bootstrap_address}"
     export KAFKA_TOPIC="${google_managed_kafka_topic.bus_topic.topic_id}"
-    export MQTT_BROKER="mqtt.hsl.fi"
-    export MQTT_PORT="8883"
-    export MQTT_TOPIC="/hfp/v2/journey/ongoing/vp/bus/#"
+    export MQTT_BROKER="${var.mqtt_broker}"
+    export MQTT_PORT="${var.mqtt_port}"
+    export MQTT_TOPIC="${var.mqtt_topic}"
     export LOG_LEVEL="INFO"
     ENVEOF
     

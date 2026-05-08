@@ -6,7 +6,7 @@
 
 # Service Account for Cloud Run Web App
 resource "google_service_account" "app_service" {
-  account_id   = "hsl-app-service"
+  account_id   = var.app_service_account_id
   display_name = "Service Account for HSL Bus Web App"
   description  = "Service account for Cloud Run web application"
 }
@@ -42,44 +42,44 @@ resource "google_project_iam_member" "app_redis_role" {
 
 # VPC Connector for Cloud Run to access private resources (Redis VM, Kafka)
 resource "google_vpc_access_connector" "app_connector" {
-  name            = "hsl-app-vpc-connector"
-  region          = var.region
-  ip_cidr_range   = "10.10.0.0/28"
-  network         = "default"
-  min_throughput  = 200
-  max_throughput  = 300
+  name           = var.app_vpc_connector_name
+  region         = var.region
+  ip_cidr_range  = var.app_vpc_cidr_range
+  network        = var.network_name
+  min_throughput = 200
+  max_throughput = 300
 }
 
 # Firewall rule to allow Cloud Run (via VPC connector) to access Redis
 resource "google_compute_firewall" "allow_app_to_redis" {
   name    = "hsl-allow-app-to-redis"
-  network = "default"
+  network = var.network_name
 
   allow {
     protocol = "tcp"
-    ports    = ["6379"]  # Redis port
+    ports    = [tostring(var.redis_port)] # Redis port
   }
 
-  source_ranges = ["10.10.0.0/28"]  # VPC connector range
+  source_ranges = [var.app_vpc_cidr_range] # VPC connector range
   target_tags   = ["allow-redis-internal"]
 }
 
 # Firewall rule to allow Cloud Run to access Kafka
 resource "google_compute_firewall" "allow_app_to_kafka" {
   name    = "hsl-allow-app-to-kafka"
-  network = "default"
+  network = var.network_name
 
   allow {
     protocol = "tcp"
-    ports    = ["9092"]  # Kafka broker
+    ports    = [for port in var.kafka_broker_ports : tostring(port)] # Kafka broker ports
   }
 
-  source_ranges = ["10.10.0.0/28"]  # VPC connector range
+  source_ranges = [var.app_vpc_cidr_range] # VPC connector range
 }
 
 # Cloud Run Web Application Service
 resource "google_cloud_run_service" "app" {
-  name     = "hsl-bus-web-app"
+  name     = var.app_service_name
   location = var.region
 
   template {
@@ -99,12 +99,12 @@ resource "google_cloud_run_service" "app" {
 
         env {
           name  = "REDIS_PORT"
-          value = "6379"
+          value = tostring(var.redis_port)
         }
 
         env {
           name  = "KAFKA_BROKER"
-          value = google_managed_kafka_cluster.bus_kafka.bootstrap_config[0].vpc_configs[0].bootstrap_address
+          value = var.kafka_bootstrap_address
         }
 
         env {
@@ -119,12 +119,12 @@ resource "google_cloud_run_service" "app" {
 
         env {
           name  = "FLASK_HOST"
-          value = "0.0.0.0"
+          value = var.flask_host
         }
 
         env {
           name  = "FLASK_PORT"
-          value = "8080"
+          value = tostring(var.flask_port)
         }
 
         # Resource requests and limits
@@ -138,18 +138,15 @@ resource "google_cloud_run_service" "app" {
 
       # Timeout for requests
       timeout_seconds = var.cloud_run_timeout_seconds
-
-      # Concurrency settings
-      concurrency = 80
     }
 
     # Metadata for VPC connector
     metadata {
       annotations = {
-        "run.googleapis.com/vpc-access-connector"  = google_vpc_access_connector.app_connector.name
-        "run.googleapis.com/vpc-access-egress"     = "private-ranges-only"
-        "autoscaling.knative.dev/maxScale"         = var.cloud_run_max_instances
-        "autoscaling.knative.dev/minScale"         = var.cloud_run_min_instances
+        "run.googleapis.com/vpc-access-connector" = google_vpc_access_connector.app_connector.name
+        "run.googleapis.com/vpc-access-egress"    = "private-ranges-only"
+        "autoscaling.knative.dev/maxScale"        = var.cloud_run_max_instances
+        "autoscaling.knative.dev/minScale"        = var.cloud_run_min_instances
       }
     }
   }
@@ -174,10 +171,10 @@ resource "google_cloud_run_service" "app" {
 
 # Allow unauthenticated access to the web app (public)
 resource "google_cloud_run_service_iam_member" "app_public_access" {
-  service       = google_cloud_run_service.app.name
-  location      = google_cloud_run_service.app.location
-  role          = "roles/run.invoker"
-  member        = "allUsers"
+  service  = google_cloud_run_service.app.name
+  location = google_cloud_run_service.app.location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
 }
 
 # ============================================================================

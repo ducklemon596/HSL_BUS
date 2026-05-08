@@ -53,7 +53,7 @@ resource "google_dataproc_cluster" "spark_cluster" {
 
   depends_on = [
     time_sleep.wait_for_iam,
-    google_storage_object.upload_setup_script
+    google_storage_bucket_object.upload_setup_script
   ]
 }
 

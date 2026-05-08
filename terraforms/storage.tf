@@ -172,8 +172,7 @@ resource "google_storage_bucket_object" "upload_shared_logic" {
   source = data.archive_file.shared_logic_zip.output_path
 
   depends_on = [
-    data.archive_file.shared_logic_zip,
-    google_storage_bucket_object.libs_folder
+    data.archive_file.shared_logic_zip
   ]
 }
 
@@ -186,21 +185,20 @@ resource "google_storage_bucket_object" "upload_main_script" {
   bucket = google_storage_bucket.spark_worker_assets.name
   source = "${path.module}/../${var.source_code_folder}/run_spark_worker.py"
 
-  depends_on = [google_storage_bucket_object.code_folder]
+  depends_on = []
 }
 
 /**
  * Upload compressed source code
  * Contains the main Spark data processing logic
  */
-resource "google_storage_object" "upload_src_zip" {
+resource "google_storage_bucket_object" "upload_src_zip" {
   name   = var.source_code_artifacts.source_code_path
   bucket = google_storage_bucket.spark_worker_assets.name
   source = data.archive_file.source_code_zip.output_path
 
   depends_on = [
-    data.archive_file.source_code_zip,
-    google_storage_object.code_folder
+    data.archive_file.source_code_zip
   ]
 }
 
@@ -213,7 +211,7 @@ resource "google_storage_bucket_object" "upload_setup_script" {
   bucket = google_storage_bucket.spark_worker_assets.name
   source = "${path.module}/../${var.source_code_folder}/setup_env.sh"
 
-  depends_on = [google_storage_bucket_object.code_folder]
+  depends_on = []
 }
 
 # ============================================================================

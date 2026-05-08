@@ -14,9 +14,9 @@ resource "google_compute_instance" "redis_server" {
 
   network_interface {
     network = "default"
-    
+
     # Vẫn giữ access_config để lấy Public IP cho bạn dễ debug từ máy cá nhân
-    access_config {} 
+    access_config {}
   }
 
   # Startup script tự động cài đặt và cấu hình
@@ -53,7 +53,7 @@ resource "google_compute_firewall" "allow_redis" {
   }
 
   source_tags = ["bus-dataproc-node"]
-  target_tags   = ["allow-redis-internal"]
+  target_tags = ["allow-redis-internal"]
 }
 
 # =====================================================================

@@ -30,6 +30,26 @@ source_code_artifacts = {
   setup_script_path = "scripts/setup_env.sh"
 }
 
+# Networking and runtime variables
+network_name            = "default"
+app_service_name        = "hsl-bus-web-app"
+app_service_account_id  = "hsl-app-service"
+app_vpc_connector_name  = "hsl-app-vpc-connector"
+app_vpc_cidr_range      = "10.10.0.0/28"
+redis_port              = 6379
+kafka_bootstrap_address = ""
+
+# MQTT ingestion configuration
+mqtt_broker = "mqtt.hsl.fi"
+mqtt_port   = 8883
+mqtt_topic  = "/hfp/v2/journey/ongoing/vp/bus/#"
+
+# Ingestion VM naming and image
+ingestion_service_account_id = "hsl-ingestion-service"
+ingestion_vm_name            = "hsl-ingestion-vm"
+ingestion_vm_image           = "ubuntu-os-cloud/ubuntu-2204-lts"
+
+
 # ============================================================================
 # KAFKA CONFIGURATION
 # ============================================================================
@@ -42,8 +62,8 @@ kafka_replication_factor = 3
 # INGESTION SERVICE VM CONFIGURATION
 # ============================================================================
 # Small VM instance for MQTT to Kafka ingestion service
-ingestion_vm_machine_type = "e2-micro"  # Small, cost-efficient instance
-ingestion_vm_disk_size_gb = 20          # Boot disk size
+ingestion_vm_machine_type = "e2-micro" # Small, cost-efficient instance
+ingestion_vm_disk_size_gb = 20         # Boot disk size
 ingestion_vm_disk_type    = "pd-standard"
 
 # ============================================================================
