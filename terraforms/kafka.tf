@@ -1,8 +1,6 @@
-locals {
-  kafka_location = var.kafka_location != "" ? var.kafka_location : var.region
-}
-
-# 1. Gọi mạng default của Google theo vùng cấu hình
+# Managed Kafka cluster created in the selected subnet.
+# Managed Kafka cannot receive compute tags directly, so network restrictions
+# are enforced through source ranges and private VPC connectivity.
 data "google_compute_subnetwork" "kafka_subnet" {
   name   = var.kafka_subnet_name
   region = var.region
@@ -27,8 +25,26 @@ resource "google_managed_kafka_cluster" "bus_kafka" {
     }
   }
 
-  labels = var.resource_labels
+  labels = local.common_labels
 }
+
+resource "time_sleep" "wait_for_kafka" {
+  depends_on      = [google_managed_kafka_cluster.bus_kafka]
+  create_duration = "180s"
+}
+
+output "kafka_bootstrap_address" {
+  description = "Managed Kafka bootstrap broker address."
+  value       = local.kafka_bootstrap_address
+}
+
+output "kafka_port" {
+  description = "Primary Kafka broker port."
+  value       = var.kafka_port
+}
+
+# Managed Kafka cannot accept compute-target tags, so network-level restrictions
+# are enforced by source ranges and private VPC connectivity.
 
 # 3. Tạo Topic hứng dữ liệu ngay khi cụm vừa khởi động xong
 resource "google_managed_kafka_topic" "bus_topic" {
@@ -39,4 +55,6 @@ resource "google_managed_kafka_topic" "bus_topic" {
 
   partition_count    = var.kafka_partition_count
   replication_factor = var.kafka_replication_factor
+
+  depends_on = [time_sleep.wait_for_kafka]
 }

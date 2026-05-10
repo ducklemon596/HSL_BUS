@@ -14,14 +14,6 @@
 
 # Local variables to reduce code repetition and centralize configuration
 locals {
-  common_labels = merge(
-    var.resource_labels,
-    {
-      environment = var.environment
-      created_at  = timestamp()
-    }
-  )
-
   data_lake_labels = merge(
     local.common_labels,
     {
@@ -148,7 +140,7 @@ data "archive_file" "shared_logic_zip" {
  */
 data "archive_file" "source_code_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/../${var.source_code_folder}"
+  source_dir  = "${path.module}/../${var.source_code_folder}/src"
   output_path = "${path.module}/tmp/src.zip"
 
   excludes = [

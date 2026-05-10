@@ -10,7 +10,7 @@ enable_versioning    = true
 force_destroy_bucket = true # Set to false in production
 
 shared_logic_folder = "shared_lib"
-source_code_folder  = "spark_service/src"
+source_code_folder  = "spark_service"
 
 resource_labels = {
   project    = "hsl-bus-streaming"
@@ -31,13 +31,14 @@ source_code_artifacts = {
 }
 
 # Networking and runtime variables
-network_name            = "default"
-app_service_name        = "hsl-bus-web-app"
-app_service_account_id  = "hsl-app-service"
-app_vpc_connector_name  = "hsl-app-vpc-connector"
-app_vpc_cidr_range      = "10.10.0.0/28"
-redis_port              = 6379
-kafka_bootstrap_address = ""
+network_name              = "default"
+app_service_name          = "hsl-bus-web-app"
+app_service_account_id    = "hsl-app-service"
+app_vpc_connector_name    = "hsl-app-vpc-connector"
+app_vpc_cidr_range        = "10.10.0.0/28"
+redis_port                = 6379
+repo_name                 = "hsl-bus-repo"
+app_allow_unauthenticated = false
 
 # MQTT ingestion configuration
 mqtt_broker = "mqtt.hsl.fi"
@@ -70,7 +71,7 @@ ingestion_vm_disk_type    = "pd-standard"
 # CLOUD RUN APP SERVICE CONFIGURATION
 # ============================================================================
 # Docker image for the web application service
-app_service_image = "gcr.io/hsl-bus-streaming-495014/hsl-bus-web:latest"
+app_service_image = "asia-southeast1-docker.pkg.dev/hsl-bus-streaming-495014/hsl-repo/hsl-bus-web:latest"
 # Memory: 512MB provides good balance for Flask SocketIO app
 cloud_run_memory = "512Mi"
 # CPU: 1 CPU sufficient for lightweight web app

@@ -128,6 +128,78 @@ variable "spark_job_jars_packages" {
   default     = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,com.google.cloud.hosted.kafka:managed-kafka-auth-login-handler:1.0.6"
 }
 
+variable "dataproc_cluster_name" {
+  description = "Dataproc cluster name"
+  type        = string
+  default     = "hsl-spark-cluster"
+}
+
+variable "dataproc_master_machine_type" {
+  description = "Machine type for the Dataproc master node"
+  type        = string
+  default     = "e2-standard-2"
+}
+
+variable "dataproc_master_disk_size_gb" {
+  description = "Boot disk size for the Dataproc master node"
+  type        = number
+  default     = 50
+  validation {
+    condition     = var.dataproc_master_disk_size_gb > 0
+    error_message = "Dataproc master disk size must be greater than zero."
+  }
+}
+
+variable "dataproc_master_disk_type" {
+  description = "Boot disk type for the Dataproc master node"
+  type        = string
+  default     = "pd-standard"
+}
+
+variable "dataproc_worker_machine_type" {
+  description = "Machine type for Dataproc worker nodes"
+  type        = string
+  default     = "e2-standard-2"
+}
+
+variable "dataproc_worker_num_instances" {
+  description = "Number of Dataproc worker nodes"
+  type        = number
+  default     = 2
+  validation {
+    condition     = var.dataproc_worker_num_instances >= 0
+    error_message = "Dataproc worker count must be zero or greater."
+  }
+}
+
+variable "dataproc_worker_disk_size_gb" {
+  description = "Boot disk size for Dataproc worker nodes"
+  type        = number
+  default     = 50
+  validation {
+    condition     = var.dataproc_worker_disk_size_gb > 0
+    error_message = "Dataproc worker disk size must be greater than zero."
+  }
+}
+
+variable "dataproc_worker_disk_type" {
+  description = "Boot disk type for Dataproc worker nodes"
+  type        = string
+  default     = "pd-standard"
+}
+
+variable "dataproc_image_version" {
+  description = "Dataproc image version for the cluster"
+  type        = string
+  default     = "2.1-debian11"
+}
+
+variable "dataproc_enable_component_gateway" {
+  description = "Enable Dataproc component gateway for UI access"
+  type        = bool
+  default     = true
+}
+
 variable "kafka_cluster_id" {
   description = "Managed Kafka cluster identifier"
   type        = string
@@ -289,6 +361,12 @@ variable "cloud_run_max_instances" {
   }
 }
 
+variable "app_allow_unauthenticated" {
+  description = "Allow public unauthenticated access to the Cloud Run service"
+  type        = bool
+  default     = false
+}
+
 variable "network_name" {
   description = "Name of the VPC network to deploy resources into"
   type        = string
@@ -325,16 +403,48 @@ variable "redis_port" {
   default     = 6379
 }
 
-variable "kafka_bootstrap_address" {
-  description = "Kafka bootstrap address for clients to connect"
+variable "resource_name_prefix" {
+  description = "Common prefix used for generated resource names"
   type        = string
-  default     = ""
+  default     = "hsl"
 }
 
-variable "kafka_broker_ports" {
-  description = "Ports used by Kafka brokers for ingestion and app connectivity"
-  type        = list(number)
-  default     = [9092, 9093, 9094]
+variable "repo_name" {
+  description = "Artifact Registry repository name used by the ingestion VM container"
+  type        = string
+  default     = "hsl-bus-repo"
+}
+
+variable "redis_machine_type" {
+  description = "Machine type for the Redis server"
+  type        = string
+  default     = "e2-micro"
+}
+
+variable "redis_disk_size_gb" {
+  description = "Boot disk size in GB for Redis server"
+  type        = number
+  default     = 20
+  validation {
+    condition     = var.redis_disk_size_gb > 0
+    error_message = "Redis disk size must be greater than zero."
+  }
+}
+
+variable "redis_disk_type" {
+  description = "Boot disk type for Redis server"
+  type        = string
+  default     = "pd-standard"
+}
+
+variable "kafka_port" {
+  description = "Primary Kafka broker port"
+  type        = number
+  default     = 9092
+  validation {
+    condition     = var.kafka_port > 0
+    error_message = "Kafka port must be greater than zero."
+  }
 }
 
 variable "flask_host" {
