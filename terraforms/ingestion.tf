@@ -39,22 +39,27 @@ resource "time_sleep" "wait_for_ingestion_iam" {
 
 resource "google_compute_firewall" "allow_ingestion_to_kafka" {
   name    = var.ingestion_firewall_name
-  network = var.network_name
+  network = google_compute_network.vpc_network.id
+
+  # Bắt buộc khai báo chiều đi ra
+  direction = "EGRESS"
 
   allow {
     protocol = "tcp"
     ports    = [tostring(var.kafka_port)]
   }
 
-  source_tags = [local.ingestion_node_tag]
-  # Managed Kafka targets cannot be tagged like compute instances.
-  depends_on = [google_managed_kafka_cluster.bus_kafka]
+  # 1. TARGET: Áp dụng luật này (Bác bảo vệ đứng gác) ở máy ảo Ingestion
+  target_tags = [local.ingestion_node_tag]
+
+  # 2. DESTINATION: Đích đến được phép đi tới là dải IP chứa Kafka
+  destination_ranges = [google_compute_subnetwork.kafka_subnet.ip_cidr_range]
 }
 
 resource "google_compute_instance" "ingestion_vm" {
   name         = var.ingestion_vm_name
   machine_type = var.ingestion_vm_machine_type
-  zone         = var.zone
+  zone         = "asia-southeast1-b"
 
   boot_disk {
     initialize_params {
@@ -73,6 +78,8 @@ resource "google_compute_instance" "ingestion_vm" {
                 value: ${local.kafka_bootstrap_host}
               - name: KAFKA_PORT
                 value: ${tostring(var.kafka_port)}
+              - name: KAFKA_TOPIC
+                value: ${var.kafka_topic_id}
             restartPolicy: Always
         restartPolicy: Always
     EOT
@@ -80,7 +87,7 @@ resource "google_compute_instance" "ingestion_vm" {
   }
 
   network_interface {
-    network = var.network_name
+    subnetwork = google_compute_subnetwork.bus_subnet.id
   }
 
   service_account {
@@ -96,6 +103,8 @@ resource "google_compute_instance" "ingestion_vm" {
     time_sleep.wait_for_kafka,
     google_managed_kafka_topic.bus_topic
   ]
+
+  allow_stopping_for_update = true
 }
 
 output "ingestion_vm_internal_ip" {

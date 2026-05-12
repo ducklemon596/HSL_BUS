@@ -137,7 +137,7 @@ variable "dataproc_cluster_name" {
 variable "dataproc_master_machine_type" {
   description = "Machine type for the Dataproc master node"
   type        = string
-  default     = "e2-standard-2"
+  default     = "n1-highmem-2"
 }
 
 variable "dataproc_master_disk_size_gb" {
@@ -159,7 +159,7 @@ variable "dataproc_master_disk_type" {
 variable "dataproc_worker_machine_type" {
   description = "Machine type for Dataproc worker nodes"
   type        = string
-  default     = "e2-standard-2"
+  default     = "n1-highmem-2"
 }
 
 variable "dataproc_worker_num_instances" {
@@ -229,7 +229,7 @@ variable "kafka_location" {
 variable "kafka_subnet_name" {
   description = "Name of the subnet to attach Kafka resources to"
   type        = string
-  default     = "default"
+  default     = "hsl-kafka-subnet"
 }
 
 variable "kafka_vcpu_count" {

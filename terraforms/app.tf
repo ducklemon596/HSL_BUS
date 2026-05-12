@@ -91,26 +91,6 @@ resource "google_cloud_run_service" "app" {
         }
 
         env {
-          name  = "KAFKA_BROKERS"
-          value = local.kafka_bootstrap_host
-        }
-
-        env {
-          name  = "KAFKA_PORT"
-          value = tostring(var.kafka_port)
-        }
-
-        env {
-          name  = "KAFKA_TOPIC"
-          value = google_managed_kafka_topic.bus_topic.topic_id
-        }
-
-        env {
-          name  = "ENVIRONMENT"
-          value = var.environment
-        }
-
-        env {
           name  = "FLASK_HOST"
           value = var.flask_host
         }

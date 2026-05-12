@@ -1,9 +1,15 @@
-# Managed Kafka cluster created in the selected subnet.
-# Managed Kafka cannot receive compute tags directly, so network restrictions
-# are enforced through source ranges and private VPC connectivity.
-data "google_compute_subnetwork" "kafka_subnet" {
-  name   = var.kafka_subnet_name
-  region = var.region
+# 1. Tạo mới Subnet dành riêng cho Kafka (Thay thế cho block data cũ)
+# Nơi đây sẽ là "vùng xanh" hoàn toàn cách ly, chuyên chứa lõi dữ liệu
+resource "google_compute_subnetwork" "kafka_subnet" {
+  name          = var.kafka_subnet_name
+  ip_cidr_range = "10.10.1.0/24" # Dải IP độc lập (bạn có thể thay đổi tùy ý, miễn không trùng với bus_subnet)
+  region        = var.region
+
+  # LƯU Ý: Đảm bảo biến này trỏ đúng vào resource VPC tổng của bạn
+  network = google_compute_network.vpc_network.id
+
+  # Bật Private Google Access để các dịch vụ Managed hoạt động trơn tru
+  private_ip_google_access = true
 }
 
 # 2. Tạo cụm Managed Kafka với cấu hình từ biến
@@ -20,17 +26,23 @@ resource "google_managed_kafka_cluster" "bus_kafka" {
   gcp_config {
     access_config {
       network_configs {
-        subnet = data.google_compute_subnetwork.kafka_subnet.id
+        # Đã cập nhật: Trỏ thẳng vào resource subnet vừa tạo ở trên thay vì data
+        subnet = google_compute_subnetwork.kafka_subnet.id
       }
     }
   }
 
+  rebalance_config {
+    mode = "AUTO_REBALANCE_ON_SCALE_UP"
+  }
+
+  # Thêm nhãn để dễ quản lý và phân loại tài nguyên
   labels = local.common_labels
 }
 
 resource "time_sleep" "wait_for_kafka" {
   depends_on      = [google_managed_kafka_cluster.bus_kafka]
-  create_duration = "180s"
+  create_duration = "120s"
 }
 
 output "kafka_bootstrap_address" {

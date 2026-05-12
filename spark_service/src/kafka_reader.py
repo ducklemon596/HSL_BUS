@@ -1,10 +1,8 @@
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, from_json
 
-from shared_lib import get_settings_instance
-from schemas import BUS_SCHEMA
-
-settings_instance = get_settings_instance()
+from shared_lib.settings import get_settings_instance
+from src.schemas import BUS_SCHEMA
 
 jaas_config = (
     "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;"
@@ -30,7 +28,10 @@ def get_kafka_options(
 
 
 def read_from_kafka(spark: SparkSession, starting_offsets: str = "latest") -> DataFrame:
-    """Read data from Kafka topic and parse JSON messages.
+    """
+    Read data from Kafka topic and parse JSON messages.
+
+    Retrieves Kafka configuration from the centralized settings instance.
 
     Args:
         spark: SparkSession instance
@@ -38,17 +39,20 @@ def read_from_kafka(spark: SparkSession, starting_offsets: str = "latest") -> Da
 
     Returns:
         DataFrame with parsed bus data
+
+    Raises:
+        RuntimeError: If settings haven't been initialized
     """
-    dynamic_bootstrap_servers = spark.conf.get(
-        "spark.hsl.kafka.servers", settings_instance.SPARK_KAFKA_BOOTSTRAP_SERVERS
-    )
-    dynamic_topic = spark.conf.get(
-        "spark.hsl.kafka.topic", settings_instance.KAFKA_TOPIC
-    )
+    config = get_settings_instance()
+    config.assert_initialized()
+
+    # Get Kafka settings from centralized configuration
+    bootstrap_servers = config.KAFKA_BROKERS
+    topic = config.KAFKA_TOPIC
 
     options = get_kafka_options(
-        bootstrap_servers=dynamic_bootstrap_servers,
-        topic=dynamic_topic,
+        bootstrap_servers=bootstrap_servers,
+        topic=topic,
         starting_offsets=starting_offsets,
     )
 

@@ -16,3 +16,6 @@ terraforms/terraform.tfstate.backup
 
 # Ignoring any text files
 *.txt
+
+# Ignoring any zip files
+*.zip

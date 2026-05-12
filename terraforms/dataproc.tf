@@ -26,7 +26,7 @@ resource "google_dataproc_cluster" "spark_cluster" {
       }
     }
 
-    # OS
+    # OS and jar dependencies
     software_config {
       image_version = var.dataproc_image_version
     }
@@ -34,7 +34,7 @@ resource "google_dataproc_cluster" "spark_cluster" {
     # Initialization actions for cluster setup
     initialization_action {
       script      = "gs://${google_storage_bucket.spark_worker_assets.name}/${google_storage_bucket_object.upload_setup_script.name}"
-      timeout_sec = 600 # 10 minutes timeout
+      timeout_sec = 120 # 2 minutes timeout
     }
 
     # Service Account & IAM Scopes
@@ -43,6 +43,12 @@ resource "google_dataproc_cluster" "spark_cluster" {
       service_account_scopes = [
         "https://www.googleapis.com/auth/cloud-platform"
       ]
+
+      subnetwork = google_compute_subnetwork.bus_subnet.id
+
+      # BẢO MẬT: Không cấp IP Public cho cụm Spark.
+      # Nó sẽ dùng Cloud NAT của bus_subnet để ra mạng tải thư viện.
+      internal_ip_only = true
 
       tags = [local.dataproc_node_tag]
     }
@@ -57,11 +63,39 @@ resource "google_dataproc_cluster" "spark_cluster" {
     time_sleep.wait_for_iam,
     google_storage_bucket_object.upload_setup_script
   ]
+
+  lifecycle {
+    ignore_changes = [
+      # Bỏ qua mọi sự thay đổi về chuỗi phiên bản hệ điều hành do GCP tự cập nhật
+      cluster_config[0].software_config[0].image_version,
+    ]
+  }
 }
 
 resource "time_sleep" "wait_for_dataproc" {
   depends_on      = [google_dataproc_cluster.spark_cluster]
   create_duration = "120s"
+}
+
+resource "google_compute_firewall" "allow_dataproc_internal" {
+  name    = "hsl-allow-dataproc-internal"
+  network = google_compute_network.vpc_network.id
+
+  allow {
+    protocol = "icmp" # Cho phép ping
+  }
+  allow {
+    protocol = "tcp"
+    ports    = ["0-65535"] # Mở hết cổng cho nội bộ Dataproc
+  }
+  allow {
+    protocol = "udp"
+    ports    = ["0-65535"]
+  }
+
+  # Quan trọng: Chỉ cho phép các máy có tag Dataproc nói chuyện với nhau
+  source_tags = [local.dataproc_node_tag]
+  target_tags = [local.dataproc_node_tag]
 }
 
 # Init service account for Spark Workers 

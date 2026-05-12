@@ -140,13 +140,16 @@ data "archive_file" "shared_logic_zip" {
  */
 data "archive_file" "source_code_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/../${var.source_code_folder}/src"
+  source_dir  = "${path.module}/../${var.source_code_folder}"
   output_path = "${path.module}/tmp/src.zip"
 
   excludes = [
     "__pycache__",
     "*.pyc",
-    ".pytest_cache"
+    ".pytest_cache",
+    "README.md",
+    "run_spark_worker.py",
+    "setup_env.sh"
   ]
 }
 

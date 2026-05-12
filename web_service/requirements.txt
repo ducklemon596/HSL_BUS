@@ -1,3 +1,4 @@
 flask
 flask-socketio
-../shared_libs[redis]
+gunicorn
+redis

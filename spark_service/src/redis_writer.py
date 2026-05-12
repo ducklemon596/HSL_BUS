@@ -3,35 +3,65 @@ from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, row_number, avg, max as max_, min as min_, window
 from pyspark.sql.window import Window as SparkWindow
 
-from shared_lib import get_logger_instance, get_settings_instance
+from shared_lib.logger import get_logger_instance
 
 logger = get_logger_instance(__name__)
-settings_instance = get_settings_instance()
+
+# Global Redis client pool (connection pooling for efficiency across partitions)
+_redis_client = None
 
 
-def _get_redis_client(redis_host=None, redis_port=None, redis_password=None):
+def _get_redis_client(redis_host: str, redis_port: int):
+    """
+    Get or create a Redis client with connection pooling.
+
+    This is called within worker executors via foreachPartition, so we use
+    a module-level cache to avoid recreating connections per partition.
+
+    Args:
+        redis_host: Redis server hostname
+        redis_port: Redis server port
+
+    Returns:
+        Redis client instance
+    """
     import redis
 
-    host = redis_host or settings_instance.REDIS_HOST
-    port = redis_port or settings_instance.REDIS_PORT
-    password = redis_password or getattr(settings_instance, "REDIS_PASSWORD", None)
+    global _redis_client
 
-    if not hasattr(redis, "_my_global_client"):
+    if _redis_client is not None:
+        return _redis_client
+
+    try:
         pool = redis.ConnectionPool(
-            host=host,
-            port=port,
-            password=password,
+            host=redis_host,
+            port=redis_port,
             decode_responses=True,
             max_connections=10,
         )
-        redis._my_global_client = redis.Redis(connection_pool=pool)
-
-    return redis._my_global_client
+        _redis_client = redis.Redis(connection_pool=pool)
+        # Test connection
+        _redis_client.ping()
+        return _redis_client
+    except Exception as e:
+        logger.error(f"❌ Failed to connect to Redis at {redis_host}:{redis_port}: {e}")
+        raise
 
 
 def _process_position_partition(
-    iterator, redis_host=None, redis_port=None, redis_password=None
+    iterator, redis_host: str, redis_port: int, redis_password=None
 ):
+    """
+    Process a partition of position data and write to Redis.
+
+    Uses Lua scripting to ensure atomic operations on the server side.
+
+    Args:
+        iterator: Row iterator from Spark partition
+        redis_host: Redis server hostname
+        redis_port: Redis server port
+        redis_password: Redis password (unused, but kept for compatibility)
+    """
     try:
         first_row = next(iterator)
     except StopIteration:
@@ -39,7 +69,7 @@ def _process_position_partition(
 
     from itertools import chain
 
-    redis_client = _get_redis_client(redis_host, redis_port, redis_password)
+    redis_client = _get_redis_client(redis_host, redis_port)
 
     LUA_POSITION_SCRIPT = """
     local bus_key = KEYS[1]
@@ -80,24 +110,46 @@ def _process_position_partition(
 def write_position_to_redis(
     batch_df: DataFrame,
     batch_id: int,
-    redis_host=None,
-    redis_port=None,
+    redis_host: str,
+    redis_port: int,
     redis_password=None,
 ):
+    """
+    Write current bus positions to Redis for real-time tracking.
+
+    Args:
+        batch_df: DataFrame containing position data
+        batch_id: Batch ID from Spark Streaming
+        redis_host: Redis server hostname
+        redis_port: Redis server port
+        redis_password: Redis password (unused, but kept for compatibility)
+    """
     try:
         batch_df.foreachPartition(
             lambda iterator: _process_position_partition(
                 iterator, redis_host, redis_port, redis_password
             )
         )
-        logger.info(f"💾 Batch {batch_id}: Dispatched writes to Redis via Workers")
+        logger.info(f"💾 Batch {batch_id}: Dispatched position updates to Redis")
     except Exception as exc:
-        logger.error(f"❌ Error dispatching Redis writes: {exc}")
+        logger.error(f"❌ Error dispatching Redis position writes: {exc}")
+        raise
 
 
 def _process_speed_partition(
-    iterator, redis_host=None, redis_port=None, redis_password=None
+    iterator, redis_host: str, redis_port: int, redis_password=None
 ):
+    """
+    Process a partition of speed/traffic data and write to Redis.
+
+    Uses Lua scripting to ensure only the most recent traffic status is stored.
+
+    Args:
+        iterator: Row iterator from Spark partition
+        redis_host: Redis server hostname
+        redis_port: Redis server port
+        redis_password: Redis password (unused, but kept for compatibility)
+    """
     try:
         first_row = next(iterator)
     except StopIteration:
@@ -105,7 +157,7 @@ def _process_speed_partition(
 
     from itertools import chain
 
-    redis_client = _get_redis_client(redis_host, redis_port, redis_password)
+    redis_client = _get_redis_client(redis_host, redis_port)
 
     LUA_TRAFFIC_SCRIPT = """
     local bus_key = KEYS[1]
@@ -154,10 +206,22 @@ def _process_speed_partition(
 def write_speed_avg_to_redis(
     batch_df: DataFrame,
     batch_id: int,
-    redis_host=None,
-    redis_port=None,
+    redis_host: str,
+    redis_port: int,
     redis_password=None,
 ):
+    """
+    Write aggregated speed data and traffic status to Redis.
+
+    Deduplicates by keeping only the most recent window per vehicle.
+
+    Args:
+        batch_df: DataFrame containing aggregated speed data
+        batch_id: Batch ID from Spark Streaming
+        redis_host: Redis server hostname
+        redis_port: Redis server port
+        redis_password: Redis password (unused, but kept for compatibility)
+    """
     window_spec = SparkWindow.partitionBy("unique_veh_id").orderBy(
         col("window_end").desc()
     )
@@ -172,16 +236,27 @@ def write_speed_avg_to_redis(
                 iterator, redis_host, redis_port, redis_password
             )
         )
-        logger.info(
-            f"💾 Batch {batch_id}: Dispatched speed averages to Redis via Workers"
-        )
+        logger.info(f"💾 Batch {batch_id}: Dispatched speed/traffic data to Redis")
     except Exception as exc:
-        logger.error(f"❌ Error dispatching speed averages writes: {exc}")
+        logger.error(f"❌ Error dispatching speed/traffic writes: {exc}")
+        raise
 
 
 def write_position_to_redis_query(
-    clean_df: DataFrame, redis_host=None, redis_port=None, redis_password=None
+    clean_df: DataFrame, redis_host: str, redis_port: int, redis_password=None
 ):
+    """
+    Create a streaming query to continuously write positions to Redis.
+
+    Args:
+        clean_df: Cleaned DataFrame with position data
+        redis_host: Redis server hostname
+        redis_port: Redis server port
+        redis_password: Redis password (unused, but kept for compatibility)
+
+    Returns:
+        StreamingQuery object
+    """
     return (
         clean_df.select(
             "unique_veh_id",
@@ -205,8 +280,20 @@ def write_position_to_redis_query(
 
 
 def write_speed_avg_to_redis_query(
-    clean_df: DataFrame, redis_host=None, redis_port=None, redis_password=None
+    clean_df: DataFrame, redis_host: str, redis_port: int, redis_password=None
 ):
+    """
+    Create a streaming query to continuously write speed/traffic data to Redis.
+
+    Args:
+        clean_df: Cleaned DataFrame with event data
+        redis_host: Redis server hostname
+        redis_port: Redis server port
+        redis_password: Redis password (unused, but kept for compatibility)
+
+    Returns:
+        StreamingQuery object
+    """
     return (
         clean_df.withWatermark("tst", "1 minute")
         .groupBy(window(col("tst"), "5 minute", "1 minute"), col("unique_veh_id"))

@@ -9,7 +9,7 @@ bucket_storage_class = "STANDARD"
 enable_versioning    = true
 force_destroy_bucket = true # Set to false in production
 
-shared_logic_folder = "shared_lib"
+shared_logic_folder = "libs"
 source_code_folder  = "spark_service"
 
 resource_labels = {
@@ -24,7 +24,7 @@ bucket_folders = {
 }
 
 source_code_artifacts = {
-  shared_logic_path = "libs/shared_logic.zip"
+  shared_logic_path = "libs/shared_lib.zip"
   main_script_path  = "code/main.py"
   source_code_path  = "code/src.zip"
   setup_script_path = "scripts/setup_env.sh"
@@ -34,10 +34,10 @@ source_code_artifacts = {
 network_name              = "default"
 app_service_name          = "hsl-bus-web-app"
 app_service_account_id    = "hsl-app-service"
-app_vpc_connector_name    = "hsl-app-vpc-connector"
+app_vpc_connector_name    = "hsl-app-vpc-connector-v2"
 app_vpc_cidr_range        = "10.10.0.0/28"
 redis_port                = 6379
-repo_name                 = "hsl-bus-repo"
+repo_name                 = "hsl-repo"
 app_allow_unauthenticated = false
 
 # MQTT ingestion configuration
@@ -55,7 +55,7 @@ ingestion_vm_image           = "ubuntu-os-cloud/ubuntu-2204-lts"
 # KAFKA CONFIGURATION
 # ============================================================================
 # kafka_partition_count: Number of partitions for the Kafka topic (8 partitions)
-kafka_partition_count = 8
+kafka_partition_count = 4
 # kafka_replication_factor: Replication factor ensures 3 copies of each message
 kafka_replication_factor = 3
 
@@ -80,5 +80,5 @@ cloud_run_cpu = 1
 cloud_run_timeout_seconds = 3600
 # Min instances: 0 = auto-scale to zero when no requests (cost savings)
 cloud_run_min_instances = 0
-# Max instances: Scale up to 100 for high load
-cloud_run_max_instances = 100
+# Max instances: Scale up to 20 for high load
+cloud_run_max_instances = 2

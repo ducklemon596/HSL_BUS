@@ -1,3 +1,5 @@
 python-dotenv
 paho-mqtt
-kafka-python
+confluent-kafka 
+google-auth
+requests

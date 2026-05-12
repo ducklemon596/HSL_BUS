@@ -1,15 +1,16 @@
-# HSL_BUS/web_service/Dockerfile
+# BUS_HSL/web_service/Dockerfile
 FROM python:3.10-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
-COPY ../shared_lib/ /app/shared_lib
-COPY . /app/web_service
-WORKDIR /app/web_service
 
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+COPY web_service/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && rm -rf /root/.cache/pip
+
+COPY shared_lib/ ./shared_lib/
+COPY web_service/ .
 
 EXPOSE 8080
 

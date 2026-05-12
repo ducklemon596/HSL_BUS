@@ -1,7 +1,7 @@
 resource "google_compute_instance" "redis_server" {
   name         = "${local.resource_prefix}-redis-server"
-  machine_type = var.redis_machine_type
-  zone         = var.zone
+  machine_type = "e2-micro"
+  zone         = "asia-southeast1-b"
 
   boot_disk {
     initialize_params {
@@ -12,8 +12,10 @@ resource "google_compute_instance" "redis_server" {
   }
 
   network_interface {
-    network = var.network_name
+    subnetwork = google_compute_subnetwork.bus_subnet.id
   }
+
+  allow_stopping_for_update = true
 
   metadata_startup_script = replace(<<-EOF
     #!/bin/bash
@@ -41,8 +43,9 @@ resource "time_sleep" "wait_for_redis" {
 # 2. Tường lửa CHỈ mở cho mạng nội bộ VPC (Bảo mật tuyệt đối)
 resource "google_compute_firewall" "allow_redis" {
   name    = "hsl-allow-redis-internal"
-  network = var.network_name
+  network = google_compute_network.vpc_network.name
 
+  direction = "INGRESS"
   allow {
     protocol = "tcp"
     ports    = [tostring(var.redis_port)]

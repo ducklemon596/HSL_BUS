@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from shared_lib import get_logger_instance
+from shared_lib.logger import get_logger_instance
 
 logger = get_logger_instance(__name__)
 
