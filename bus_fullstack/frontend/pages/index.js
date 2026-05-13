@@ -1,0 +1,89 @@
+import dynamic from "next/dynamic";
+import { useState } from "react";
+import SidePane from "../components/SidePane";
+
+const MapPane = dynamic(() => import("../components/MapPane"), { ssr: false });
+
+const apiBase = "same origin";
+
+export default function Home() {
+  const [dateRange, setDateRange] = useState({ start: "", end: "" });
+  const [stats, setStats] = useState([]);
+  const [gridlockPaths, setGridlockPaths] = useState([]);
+  const [showOverlay, setShowOverlay] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("Select a range and press Apply to load historical traffic analytics.");
+
+  const fetchHistorical = async (start, end) => {
+    if (!start || !end) {
+      setMessage("Please select both a start date and an end date.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const [statsRes, jamRes] = await Promise.all([
+        fetch(`/api/traffic/stats?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`),
+        fetch(`/api/traffic/jam?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`),
+      ]);
+
+      if (!statsRes.ok || !jamRes.ok) {
+        throw new Error("Unable to fetch historical analytics from the API.");
+      }
+
+      const statsJson = await statsRes.json();
+      const jamJson = await jamRes.json();
+
+      setStats(statsJson.stats || []);
+      setGridlockPaths((jamJson.results || []).map((item) => item.trajectory || []).filter((path) => path.length > 1));
+
+      if ((jamJson.results || []).length === 0) {
+        setMessage("No historical trajectories found for the selected range.");
+      }
+    } catch (error) {
+      setMessage(error.message || "Failed to load historical data.");
+      setStats([]);
+      setGridlockPaths([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <header className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-20">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Bus HSL</p>
+            <h1 className="text-3xl font-semibold text-slate-900">Real-time Monitoring & Historical Analytics</h1>
+            <p className="mt-1 text-slate-600">Live positions from Redis, traffic history from BigQuery external tables.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700">
+            API base: <span className="font-semibold">{apiBase || "same origin"}</span>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto grid max-w-7xl gap-4 px-4 py-6 lg:grid-cols-[1.8fr_0.9fr]">
+        <section className="min-h-[76vh] rounded-[32px] border border-slate-200 bg-white shadow-md">
+          <MapPane gridlockPaths={gridlockPaths} showOverlay={showOverlay} />
+        </section>
+
+        <section className="space-y-6">
+          <SidePane
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            onApply={() => fetchHistorical(dateRange.start, dateRange.end)}
+            stats={stats}
+            showOverlay={showOverlay}
+            onToggleOverlay={() => setShowOverlay(!showOverlay)}
+            loading={loading}
+            message={message}
+          />
+        </section>
+      </main>
+    </div>
+  );
+}

@@ -15,9 +15,9 @@ resource "google_dataproc_job" "hsl_bus_streaming_job" {
     ]
 
     properties = {
-      "spark.driver.memory"           = "6G"
-      "spark.executor.memory"         = "6G"
-      "spark.executor.cores"          = "2"
+      "spark.driver.memory"   = "6G"
+      "spark.executor.memory" = "6G"
+      "spark.executor.cores"  = "2"
 
       "spark.hsl.kafka.brokers"  = local.kafka_bootstrap_address
       "spark.hsl.kafka.port"     = tostring(var.kafka_port)

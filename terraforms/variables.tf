@@ -94,6 +94,16 @@ variable "resource_labels" {
   }
 }
 
+variable "analytics_dataset_id" {
+  description = "BigQuery dataset for analytics external tables"
+  type        = string
+  default     = "bus_analytics"
+  validation {
+    condition     = length(var.analytics_dataset_id) > 0
+    error_message = "Analytics dataset ID cannot be empty."
+  }
+}
+
 variable "bucket_folders" {
   description = "Structure of folders to create in spark worker bucket"
   type = object({
@@ -299,15 +309,27 @@ variable "ingestion_vm_disk_type" {
 }
 
 # ============================================================================
-# CLOUD RUN APP SERVICE CONFIGURATION
+# CLOUD RUN SERVICE CONFIGURATION
 # ============================================================================
 
-variable "app_service_image" {
-  description = "Docker image URI for web app Cloud Run service"
+# Đã đổi từ backend_api_image sang backend_image
+variable "backend_image" {
+  description = "Docker image URI for backend Cloud Run service"
   type        = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
   validation {
-    condition     = length(var.app_service_image) > 0
-    error_message = "App service image cannot be empty."
+    condition     = length(var.backend_image) > 0
+    error_message = "Backend image cannot be empty."
+  }
+}
+
+variable "frontend_service_image" {
+  description = "Docker image URI for frontend Cloud Run service"
+  type        = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+  validation {
+    condition     = length(var.frontend_service_image) > 0
+    error_message = "Frontend service image cannot be empty."
   }
 }
 
@@ -361,38 +383,22 @@ variable "cloud_run_max_instances" {
   }
 }
 
-variable "app_allow_unauthenticated" {
-  description = "Allow public unauthenticated access to the Cloud Run service"
-  type        = bool
-  default     = false
-}
-
 variable "network_name" {
   description = "Name of the VPC network to deploy resources into"
   type        = string
   default     = "default"
 }
 
-variable "app_service_name" {
-  description = "Cloud Run service name for web application"
+# Đã đổi từ backend_api_vpc_connector_name sang backend_vpc_connector_name và cập nhật giá trị an toàn
+variable "backend_vpc_connector_name" {
+  description = "VPC connector name for the backend Cloud Run service"
   type        = string
-  default     = "hsl-bus-web-app"
+  default     = "bus-backend-vpc-conn"
 }
 
-variable "app_service_account_id" {
-  description = "Service account id for Cloud Run web application"
-  type        = string
-  default     = "hsl-app-service"
-}
-
-variable "app_vpc_connector_name" {
-  description = "VPC connector name for the Cloud Run web application"
-  type        = string
-  default     = "hsl-app-vpc-connector"
-}
-
-variable "app_vpc_cidr_range" {
-  description = "CIDR range assigned to the Cloud Run VPC connector"
+# Đã đổi từ backend_api_vpc_cidr_range sang backend_vpc_cidr_range
+variable "backend_vpc_cidr_range" {
+  description = "CIDR range assigned to the backend Cloud Run VPC connector"
   type        = string
   default     = "10.10.0.0/28"
 }
@@ -445,18 +451,6 @@ variable "kafka_port" {
     condition     = var.kafka_port > 0
     error_message = "Kafka port must be greater than zero."
   }
-}
-
-variable "flask_host" {
-  description = "Host address for the Flask web application"
-  type        = string
-  default     = "0.0.0.0"
-}
-
-variable "flask_port" {
-  description = "Port for the Flask web application"
-  type        = number
-  default     = 8080
 }
 
 variable "ingestion_vm_image" {
