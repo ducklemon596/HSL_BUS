@@ -66,8 +66,10 @@ resource "google_dataproc_cluster" "spark_cluster" {
 
   lifecycle {
     ignore_changes = [
-      # Bỏ qua mọi sự thay đổi về chuỗi phiên bản hệ điều hành do GCP tự cập nhật
       cluster_config[0].software_config[0].image_version,
+      cluster_config[0].software_config[0].properties,
+      cluster_config[0].gce_cluster_config[0].service_account_scopes,
+      cluster_config[0].bucket,
     ]
   }
 }

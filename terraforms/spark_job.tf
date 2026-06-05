@@ -42,3 +42,8 @@ resource "google_dataproc_job" "hsl_bus_streaming_job" {
     time_sleep.wait_for_redis
   ]
 }
+
+resource "time_sleep" "wait_for_spark_job" {
+  depends_on = [ google_dataproc_job.hsl_bus_streaming_job ]
+  create_duration = "60s"
+}

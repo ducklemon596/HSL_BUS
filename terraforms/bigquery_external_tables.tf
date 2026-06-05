@@ -25,6 +25,8 @@ resource "google_bigquery_table" "bronze_bus_data" {
       require_partition_filter = false
     }
   }
+
+  deletion_protection=false
 }
 
 resource "google_bigquery_table" "silver_bus_data" {
@@ -41,4 +43,6 @@ resource "google_bigquery_table" "silver_bus_data" {
     source_uris   = ["gs://${var.data_lake_bucket}/silver_layer/"]
     autodetect    = true
   }
+
+  deletion_protection=false
 }

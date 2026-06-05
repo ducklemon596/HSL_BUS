@@ -201,7 +201,7 @@ variable "dataproc_worker_disk_type" {
 variable "dataproc_image_version" {
   description = "Dataproc image version for the cluster"
   type        = string
-  default     = "2.1-debian11"
+  default     = "2.1.113-debian11"
 }
 
 variable "dataproc_enable_component_gateway" {
