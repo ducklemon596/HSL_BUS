@@ -15,6 +15,7 @@ def create_spark_session() -> SparkSession:
         )
         .config("spark.databricks.delta.optimizeWrite.enabled", "true")
         .config("spark.databricks.delta.autoCompact.enabled", "true")
+        .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
         .getOrCreate()
     )
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from "react-leaflet";
 import L from "leaflet";
 
 const DEFAULT_CENTER = [60.1699, 24.9384];
@@ -31,9 +31,13 @@ const safeNumber = (value) => {
   return Number.isFinite(number) ? number : null;
 };
 
-export default function MapPane({ gridlockPaths, showOverlay }) {
+export default function MapPane({ heatmapPoints, showOverlay }) {
   const [buses, setBuses] = useState([]);
   const [error, setError] = useState(null);
+  const maxIntensity = Math.max(
+    1,
+    ...(Array.isArray(heatmapPoints) ? heatmapPoints.map((point) => Number(point.intensity) || 0) : [])
+  );
 
   useEffect(() => {
     let intervalId;
@@ -103,20 +107,37 @@ export default function MapPane({ gridlockPaths, showOverlay }) {
         })}
 
         {showOverlay &&
-          gridlockPaths.map((path, index) => {
-            const positions = Array.isArray(path)
-              ? path
-                  .map((point) => {
-                    const lat = safeNumber(point.lat);
-                    const lon = safeNumber(point.lon);
-                    return lat !== null && lon !== null ? [lat, lon] : null;
-                  })
-                  .filter(Boolean)
-              : [];
+          heatmapPoints.map((point, index) => {
+            const lat = safeNumber(point.grid_lat);
+            const lon = safeNumber(point.grid_lon);
+            const intensity = Number(point.intensity) || 0;
+            if (lat === null || lon === null || intensity <= 0) return null;
 
-            if (positions.length < 2) return null;
+            const weight = intensity / maxIntensity;
+            const radius = 8 + weight * 22;
 
-            return <Polyline key={`path-${index}`} pathOptions={{ color: "#dc2626", weight: 4, opacity: 0.8 }} positions={positions} />;
+            return (
+              <CircleMarker
+                key={`heat-${index}-${lat}-${lon}`}
+                center={[lat, lon]}
+                radius={radius}
+                pathOptions={{
+                  color: "#991b1b",
+                  fillColor: "#ef4444",
+                  fillOpacity: 0.22 + weight * 0.38,
+                  opacity: 0.25 + weight * 0.45,
+                  weight: 1,
+                }}
+              >
+                <Popup>
+                  <div className="text-sm">
+                    <div className="font-semibold text-slate-900">Congestion grid</div>
+                    <div className="mt-1 text-slate-700">Intensity: {intensity.toLocaleString()}</div>
+                    <div className="text-slate-500">{lat.toFixed(3)}, {lon.toFixed(3)}</div>
+                  </div>
+                </Popup>
+              </CircleMarker>
+            );
           })}
       </MapContainer>
     </div>

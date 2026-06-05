@@ -88,7 +88,7 @@ def _process_position_partition(
     with redis_client.pipeline() as pipe:
         count = 0
         for row in chain([first_row], iterator):
-            bus_id = row["unique_veh_id"]
+            bus_id = f"bus:{row['unique_veh_id']}"
             tsi = row["tsi"]
             payload = {
                 "lat": float(row["lat"]),
@@ -182,7 +182,7 @@ def _process_speed_partition(
     with redis_client.pipeline() as pipe:
         count = 0
         for row in chain([first_row], iterator):
-            bus_id = row["unique_veh_id"]
+            bus_id = f"bus:{row['unique_veh_id']}"
             avg_speed = round(row["avg_speed"], 2)
             window_end = str(row["window_end"])
             is_stuck = (

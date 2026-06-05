@@ -19,3 +19,8 @@ terraforms/terraform.tfstate.backup
 
 # Ignoring any zip files
 *.zip
+
+# Ignoring frontend dependency and build artifacts
+node_modules/
+.next/
+.npm-cache/

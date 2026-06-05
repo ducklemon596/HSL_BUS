@@ -4,12 +4,13 @@ import SidePane from "../components/SidePane";
 
 const MapPane = dynamic(() => import("../components/MapPane"), { ssr: false });
 
-const apiBase = "same origin";
+const apiBase = "/api proxy";
 
 export default function Home() {
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [stats, setStats] = useState([]);
-  const [gridlockPaths, setGridlockPaths] = useState([]);
+  const [routeImpact, setRouteImpact] = useState([]);
+  const [heatmapPoints, setHeatmapPoints] = useState([]);
   const [showOverlay, setShowOverlay] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Select a range and press Apply to load historical traffic analytics.");
@@ -24,28 +25,33 @@ export default function Home() {
     setMessage("");
 
     try {
-      const [statsRes, jamRes] = await Promise.all([
-        fetch(`/api/traffic/stats?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`),
-        fetch(`/api/traffic/jam?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`),
+      const commonParams = `start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
+      const [statsRes, routeRes, heatmapRes] = await Promise.all([
+        fetch(`/api/traffic/ratio?${commonParams}`),
+        fetch(`/api/routes/impact?${commonParams}&limit=10&offset=10`),
+        fetch(`/api/traffic/heatmap?${commonParams}&limit=500&offset=500&min_intensity=1`),
       ]);
 
-      if (!statsRes.ok || !jamRes.ok) {
+      if (!statsRes.ok || !routeRes.ok || !heatmapRes.ok) {
         throw new Error("Unable to fetch historical analytics from the API.");
       }
 
       const statsJson = await statsRes.json();
-      const jamJson = await jamRes.json();
+      const routeJson = await routeRes.json();
+      const heatmapJson = await heatmapRes.json();
 
       setStats(statsJson.stats || []);
-      setGridlockPaths((jamJson.results || []).map((item) => item.trajectory || []).filter((path) => path.length > 1));
+      setRouteImpact(routeJson.routes || []);
+      setHeatmapPoints(heatmapJson.points || []);
 
-      if ((jamJson.results || []).length === 0) {
-        setMessage("No historical trajectories found for the selected range.");
+      if ((heatmapJson.points || []).length === 0 && (routeJson.routes || []).length === 0) {
+        setMessage("No historical congestion aggregates found for the selected range.");
       }
     } catch (error) {
       setMessage(error.message || "Failed to load historical data.");
       setStats([]);
-      setGridlockPaths([]);
+      setRouteImpact([]);
+      setHeatmapPoints([]);
     } finally {
       setLoading(false);
     }
@@ -68,7 +74,7 @@ export default function Home() {
 
       <main className="mx-auto grid max-w-7xl gap-4 px-4 py-6 lg:grid-cols-[1.8fr_0.9fr]">
         <section className="min-h-[76vh] rounded-[32px] border border-slate-200 bg-white shadow-md">
-          <MapPane gridlockPaths={gridlockPaths} showOverlay={showOverlay} />
+          <MapPane heatmapPoints={heatmapPoints} showOverlay={showOverlay} />
         </section>
 
         <section className="space-y-6">
@@ -77,6 +83,8 @@ export default function Home() {
             onDateRangeChange={setDateRange}
             onApply={() => fetchHistorical(dateRange.start, dateRange.end)}
             stats={stats}
+            routeImpact={routeImpact}
+            heatmapPoints={heatmapPoints}
             showOverlay={showOverlay}
             onToggleOverlay={() => setShowOverlay(!showOverlay)}
             loading={loading}

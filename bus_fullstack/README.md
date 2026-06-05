@@ -22,8 +22,11 @@ The backend service is in `backend/`.
 ### API endpoints
 
 - `GET /api/buses/live`
-- `GET /api/traffic/jam?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`
-- `GET /api/traffic/stats?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`
+- `GET /api/routes/impact?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&limit=10&offset=10`
+- `GET /api/traffic/ratio?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`
+- `GET /api/traffic/heatmap?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&limit=500&offset=500`
+- `GET /api/traffic/stats?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` aliases the time-based ratio response.
+- `GET /api/traffic/jam?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` aliases the spatial-binned heatmap response.
 
 ## Frontend
 
@@ -50,4 +53,4 @@ The frontend reads the API base URL from `NEXT_PUBLIC_API_BASE_URL` in `.env` or
 
 - Existing `web_service/` logic was preserved and not modified.
 - This new app uses Redis for live bus positions and BigQuery for historical traffic analytics.
-- Historical traffic paths are overlaid on the live Leaflet map.
+- Historical congestion grids are aggregated in BigQuery and overlaid on the live Leaflet map.

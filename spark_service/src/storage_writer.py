@@ -6,6 +6,7 @@ from pyspark.sql.functions import (
     current_timestamp,
     dayofmonth,
     expr,
+    first,
     lower,
     max as max_,
     min as min_,
@@ -141,6 +142,7 @@ def silver_layer(clean_df: DataFrame):
         .withWatermark("tst", "3 minutes")
         .groupBy(window(col("tst"), "10 minute"), col("unique_veh_id"))
         .agg(
+            first("desi", ignorenulls=True).alias("desi"),
             avg("spd").alias("avg_speed"),
             max_("tst").alias("latest_msg_tst"),
             min_("tst").alias("earliest_msg_tst"),

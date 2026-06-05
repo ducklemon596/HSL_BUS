@@ -61,7 +61,7 @@ export async function fetchHistoricalStats(startDate, endDate) {
       start_date: startDate,
       end_date: endDate,
     });
-    const data = await apiCall(`/api/traffic/stats?${queryParams.toString()}`);
+    const data = await apiCall(`/api/traffic/ratio?${queryParams.toString()}`);
     return data;
   } catch (error) {
     console.error('Error fetching historical statistics:', error);
@@ -70,16 +70,48 @@ export async function fetchHistoricalStats(startDate, endDate) {
 }
 
 /**
- * Fetch bus route information
- * @param {string} routeId - The route ID to fetch
- * @returns {Promise<object>} - Route information object
+ * Fetch route impact ranking from BigQuery
+ * @param {string} startDate - Start date for historical data (YYYY-MM-DD)
+ * @param {string} endDate - End date for historical data (YYYY-MM-DD)
+ * @param {number} pageSize - Bus HSL page-size control
+ * @returns {Promise<object>} - Route impact response
  */
-export async function fetchRouteInfo(routeId) {
+export async function fetchRouteImpact(startDate, endDate, pageSize = 10) {
   try {
-    const data = await apiCall(`/routes/${routeId}`);
+    const queryParams = new URLSearchParams({
+      start_date: startDate,
+      end_date: endDate,
+      limit: String(pageSize),
+      offset: String(pageSize),
+    });
+    const data = await apiCall(`/api/routes/impact?${queryParams.toString()}`);
     return data;
   } catch (error) {
-    console.error(`Error fetching route info for ${routeId}:`, error);
+    console.error('Error fetching route impact:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch spatial-binned congestion heatmap points
+ * @param {string} startDate - Start date for historical data (YYYY-MM-DD)
+ * @param {string} endDate - End date for historical data (YYYY-MM-DD)
+ * @param {number} pageSize - Bus HSL page-size control
+ * @returns {Promise<object>} - Heatmap point response
+ */
+export async function fetchTrafficHeatmap(startDate, endDate, pageSize = 500) {
+  try {
+    const queryParams = new URLSearchParams({
+      start_date: startDate,
+      end_date: endDate,
+      limit: String(pageSize),
+      offset: String(pageSize),
+      min_intensity: '1',
+    });
+    const data = await apiCall(`/api/traffic/heatmap?${queryParams.toString()}`);
+    return data;
+  } catch (error) {
+    console.error('Error fetching traffic heatmap:', error);
     throw error;
   }
 }
@@ -95,6 +127,7 @@ export function getApiBaseUrl() {
 export default {
   fetchLiveBuses,
   fetchHistoricalStats,
-  fetchRouteInfo,
+  fetchRouteImpact,
+  fetchTrafficHeatmap,
   getApiBaseUrl,
 };
